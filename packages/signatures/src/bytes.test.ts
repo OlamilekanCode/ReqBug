@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { bytesToHex, concatBytes, hexToBytes } from './bytes.js'
+import { bytesToHex, concatBytes, hexToBytes, base64ToBytes } from './bytes.js'
 
 describe('bytesToHex', () => {
   it('converts bytes to lowercase hexadecimal', () => {
@@ -58,5 +58,29 @@ describe('hexToBytes', () => {
     const original = new Uint8Array([1, 32, 128, 254])
 
     expect(hexToBytes(bytesToHex(original))).toEqual(original)
+  })
+})
+
+describe('base64ToBytes', () => {
+  it('decodes Base64 into its original bytes', () => {
+    expect(base64ToBytes('AA8Q/w==')).toEqual(
+      new Uint8Array([0, 15, 16, 255]),
+    )
+  })
+
+  it('decodes a UTF-8-compatible text example', () => {
+    expect(base64ToBytes('SGVsbG8=')).toEqual(
+      new Uint8Array([72, 101, 108, 108, 111]),
+    )
+  })
+
+  it.each([
+    '',
+    'abc',
+    '%%%%',
+    'AAAA=',
+    'AA=A',
+  ])('rejects malformed Base64: %s', (value) => {
+    expect(base64ToBytes(value)).toBeNull()
   })
 })

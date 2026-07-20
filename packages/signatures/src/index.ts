@@ -1,4 +1,5 @@
 export {
+  base64ToBytes,
   bytesToHex,
   concatBytes,
   hexToBytes,
@@ -23,3 +24,11 @@ export {
   type StripeSignatureVerificationResult,
   type VerifyStripeSignatureInput,
 } from './stripe.js'
+
+export {
+  verifyShopifySignature,
+  type ShopifySignatureFailureReason,
+  type ShopifySignatureVerificationResult,
+  type VerifyShopifySignatureInput,
+} from './shopify.js'
+

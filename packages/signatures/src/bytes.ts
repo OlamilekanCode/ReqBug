@@ -42,3 +42,26 @@ export function hexToBytes(hex: string): Uint8Array | null {
     }
     return bytes
 }
+
+const BASE64_PATTERN =
+  /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
+
+export function base64ToBytes(value: string): Uint8Array | null {
+  if (
+    value.length === 0 ||
+    !BASE64_PATTERN.test(value)
+  ) {
+    return null
+  }
+
+  try {
+    const binary = globalThis.atob(value)
+
+    return Uint8Array.from(
+      binary,
+      (character) => character.charCodeAt(0),
+    )
+  } catch {
+    return null
+  }
+}
