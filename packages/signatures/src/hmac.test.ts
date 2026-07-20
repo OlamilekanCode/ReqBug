@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { hexToBytes } from './bytes.js'
-import { verifyHmacSha256 } from './hmac.js'
+import { verifyHmacSha512, verifyHmacSha256 } from './hmac.js'
 
 function requiredHex(value: string): Uint8Array {
   const bytes = hexToBytes(value)
@@ -70,6 +70,35 @@ describe('verifyHmacSha256', () => {
       secret,
       payload,
       signature: new Uint8Array(31),
+    })
+
+    expect(result).toBe(false)
+  })
+})
+
+describe('verifyHmacSha512', () => {
+  const sha512Signature = requiredHex(
+    '87aa7cdea5ef619d4ff0b4241a1d6cb0' +
+    '2379f4e2ce4ec2787ad0b30545e17cde' +
+    'daa833b7d6b8a702038b274eaea3f4e4' +
+    'be9d914eeb61f1702e696c203a126854',
+  )
+
+  it('accepts the RFC 4231 SHA-512 test vector', async () => {
+    const result = await verifyHmacSha512({
+      secret,
+      payload,
+      signature: sha512Signature,
+    })
+
+    expect(result).toBe(true)
+  })
+
+  it('rejects a SHA-512 signature with the wrong length', async () => {
+    const result = await verifyHmacSha512({
+      secret,
+      payload,
+      signature: new Uint8Array(63),
     })
 
     expect(result).toBe(false)

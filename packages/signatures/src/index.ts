@@ -7,7 +7,10 @@ export {
 
 export {
   verifyHmacSha256,
+  verifyHmacSha512,
+  type VerifyHmacInput,
   type VerifyHmacSha256Input,
+  type VerifyHmacSha512Input,
 } from './hmac.js'
 
 export {
@@ -31,4 +34,11 @@ export {
   type ShopifySignatureVerificationResult,
   type VerifyShopifySignatureInput,
 } from './shopify.js'
+
+export {
+  verifyPaystackSignature,
+  type PaystackSignatureFailureReason,
+  type PaystackSignatureVerificationResult,
+  type VerifyPaystackSignatureInput,
+} from './paystack.js'
 
