@@ -42,3 +42,10 @@ export {
   type VerifyPaystackSignatureInput,
 } from './providers/paystack.js'
 
+export {
+  verifyFlutterwaveSignature,
+  type FlutterwaveSignatureFailureReason,
+  type FlutterwaveSignatureVerificationResult,
+  type VerifyFlutterwaveSignatureInput,
+} from './providers/flutterwave.js'
+
