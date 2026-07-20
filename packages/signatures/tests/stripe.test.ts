@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { verifyStripeSignature } from './stripe.js'
+import { verifyStripeSignature } from '../src/providers/stripe.js'
 
 const encoder = new TextEncoder()
 

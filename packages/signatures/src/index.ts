@@ -3,7 +3,7 @@ export {
   bytesToHex,
   concatBytes,
   hexToBytes,
-} from './bytes.js'
+} from './core/bytes.js'
 
 export {
   verifyHmacSha256,
@@ -11,14 +11,14 @@ export {
   type VerifyHmacInput,
   type VerifyHmacSha256Input,
   type VerifyHmacSha512Input,
-} from './hmac.js'
+} from './core/hmac.js'
 
 export {
   verifyGitHubSignature,
   type GitHubSignatureFailureReason,
   type GitHubSignatureVerificationResult,
   type VerifyGitHubSignatureInput,
-} from './github.js'
+} from './providers/github.js'
 
 export {
   DEFAULT_STRIPE_TOLERANCE_SECONDS,
@@ -26,19 +26,19 @@ export {
   type StripeSignatureFailureReason,
   type StripeSignatureVerificationResult,
   type VerifyStripeSignatureInput,
-} from './stripe.js'
+} from './providers/stripe.js'
 
 export {
   verifyShopifySignature,
   type ShopifySignatureFailureReason,
   type ShopifySignatureVerificationResult,
   type VerifyShopifySignatureInput,
-} from './shopify.js'
+} from './providers/shopify.js'
 
 export {
   verifyPaystackSignature,
   type PaystackSignatureFailureReason,
   type PaystackSignatureVerificationResult,
   type VerifyPaystackSignatureInput,
-} from './paystack.js'
+} from './providers/paystack.js'
 

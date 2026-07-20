@@ -1,35 +1,35 @@
-import { hexToBytes } from './bytes.js'
-import { verifyHmacSha512 } from './hmac.js'
+import { hexToBytes } from '../core/bytes.js'
+import { verifyHmacSha256 } from '../core/hmac.js'
 
-const PAYSTACK_SIGNATURE_HEX_LENGTH = 128
-const PAYSTACK_SIGNATURE_BYTE_LENGTH = 64
+const GITHUB_SIGNATURE_PREFIX = 'sha256='
+const SHA_256_HEX_LENGTH = 64
 
-export type PaystackSignatureFailureReason =
+export type GitHubSignatureFailureReason =
   | 'missing-secret'
   | 'missing-signature'
   | 'invalid-signature-format'
   | 'signature-mismatch'
 
-export type PaystackSignatureVerificationResult =
+export type GitHubSignatureVerificationResult =
   | {
       readonly verified: true
     }
   | {
       readonly verified: false
-      readonly reason: PaystackSignatureFailureReason
+      readonly reason: GitHubSignatureFailureReason
     }
 
-export interface VerifyPaystackSignatureInput {
+export interface VerifyGitHubSignatureInput {
   readonly secret: string
   readonly payload: Uint8Array
   readonly signatureHeader: string | null
 }
 
-export async function verifyPaystackSignature({
+export async function verifyGitHubSignature({
   secret,
   payload,
   signatureHeader,
-}: VerifyPaystackSignatureInput): Promise<PaystackSignatureVerificationResult> {
+}: VerifyGitHubSignatureInput): Promise<GitHubSignatureVerificationResult> {
   if (secret.length === 0) {
     return {
       verified: false,
@@ -44,26 +44,34 @@ export async function verifyPaystackSignature({
     }
   }
 
-  if (signatureHeader.length !== PAYSTACK_SIGNATURE_HEX_LENGTH) {
+  if (!signatureHeader.startsWith(GITHUB_SIGNATURE_PREFIX)) {
     return {
       verified: false,
       reason: 'invalid-signature-format',
     }
   }
 
-  const signature = hexToBytes(signatureHeader)
+  const signatureHex = signatureHeader.slice(
+    GITHUB_SIGNATURE_PREFIX.length,
+  )
 
-  if (
-    signature === null ||
-    signature.length !== PAYSTACK_SIGNATURE_BYTE_LENGTH
-  ) {
+  if (signatureHex.length !== SHA_256_HEX_LENGTH) {
     return {
       verified: false,
       reason: 'invalid-signature-format',
     }
   }
 
-  const verified = await verifyHmacSha512({
+  const signature = hexToBytes(signatureHex)
+
+  if (signature === null) {
+    return {
+      verified: false,
+      reason: 'invalid-signature-format',
+    }
+  }
+
+  const verified = await verifyHmacSha256({
     secret: new TextEncoder().encode(secret),
     payload,
     signature,

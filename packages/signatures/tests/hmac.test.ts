@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { hexToBytes } from './bytes.js'
-import { verifyHmacSha512, verifyHmacSha256 } from './hmac.js'
+import { hexToBytes } from '../src/core/bytes.js'
+import { verifyHmacSha512, verifyHmacSha256 } from '../src/core/hmac.js'
 
 function requiredHex(value: string): Uint8Array {
   const bytes = hexToBytes(value)

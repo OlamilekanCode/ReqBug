@@ -1,20 +1,24 @@
 import { describe, expect, it } from 'vitest'
 
-import { verifyShopifySignature } from './shopify.js'
+import { verifyPaystackSignature } from '../src/providers/paystack.js'
 
 const encoder = new TextEncoder()
 
-const secret = 'shopify_test_secret'
+const secret = 'paystack_test_secret'
+
 const payload = encoder.encode(
-  '{"id":123,"topic":"orders/create"}',
+  '{"event":"charge.success","data":{"reference":"reqbug-001"}}',
 )
 
 const validSignature =
-  'kmtYt66TOwN2LQRAvFudJbpYjg5c3dFvE8P13LjmNWs='
+  'd96251c1f6159a5b46826feefab432b8' +
+  '517c7caf704b4f04acb6b938ee1a6614' +
+  '3cf25913cc20f72736b87093dc705235' +
+  '2e4e2379eb05535091d363cc81a8ec18'
 
-describe('verifyShopifySignature', () => {
-  it('accepts a valid Shopify signature', async () => {
-    const result = await verifyShopifySignature({
+describe('verifyPaystackSignature', () => {
+  it('accepts a valid Paystack signature', async () => {
+    const result = await verifyPaystackSignature({
       secret,
       payload,
       signatureHeader: validSignature,
@@ -26,10 +30,10 @@ describe('verifyShopifySignature', () => {
   })
 
   it('rejects an altered payload', async () => {
-    const result = await verifyShopifySignature({
+    const result = await verifyPaystackSignature({
       secret,
       payload: encoder.encode(
-        '{"id":124,"topic":"orders/create"}',
+        '{"event":"charge.failed","data":{"reference":"reqbug-001"}}',
       ),
       signatureHeader: validSignature,
     })
@@ -41,7 +45,7 @@ describe('verifyShopifySignature', () => {
   })
 
   it('reports a missing secret', async () => {
-    const result = await verifyShopifySignature({
+    const result = await verifyPaystackSignature({
       secret: '',
       payload,
       signatureHeader: validSignature,
@@ -54,7 +58,7 @@ describe('verifyShopifySignature', () => {
   })
 
   it('reports a missing signature', async () => {
-    const result = await verifyShopifySignature({
+    const result = await verifyPaystackSignature({
       secret,
       payload,
       signatureHeader: null,
@@ -66,11 +70,11 @@ describe('verifyShopifySignature', () => {
     })
   })
 
-  it('rejects malformed Base64', async () => {
-    const result = await verifyShopifySignature({
+  it('rejects non-hexadecimal signatures', async () => {
+    const result = await verifyPaystackSignature({
       secret,
       payload,
-      signatureHeader: '%%%%',
+      signatureHeader: 'z'.repeat(128),
     })
 
     expect(result).toEqual({
@@ -79,11 +83,11 @@ describe('verifyShopifySignature', () => {
     })
   })
 
-  it('rejects a decoded signature with the wrong length', async () => {
-    const result = await verifyShopifySignature({
+  it('rejects signatures with an incorrect length', async () => {
+    const result = await verifyPaystackSignature({
       secret,
       payload,
-      signatureHeader: 'AA==',
+      signatureHeader: '00',
     })
 
     expect(result).toEqual({

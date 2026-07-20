@@ -1,5 +1,5 @@
-import { base64ToBytes } from './bytes.js'
-import { verifyHmacSha256 } from './hmac.js'
+import { base64ToBytes } from '../core/bytes.js'
+import { verifyHmacSha256 } from '../core/hmac.js'
 
 const SHOPIFY_SIGNATURE_LENGTH = 32
 

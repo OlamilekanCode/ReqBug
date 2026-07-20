@@ -1,5 +1,9 @@
-import { concatBytes, hexToBytes } from './bytes.js'
-import { verifyHmacSha256 } from './hmac.js'
+import {
+  concatBytes,
+  hexToBytes,
+} from '../core/bytes.js'
+
+import { verifyHmacSha256 } from '../core/hmac.js'
 
 const STRIPE_SIGNATURE_HEX_LENGTH = 64
 

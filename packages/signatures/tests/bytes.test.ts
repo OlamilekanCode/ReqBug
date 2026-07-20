@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { bytesToHex, concatBytes, hexToBytes, base64ToBytes } from './bytes.js'
+import { bytesToHex, concatBytes, hexToBytes, base64ToBytes } from '../src/core/bytes.js'
 
 describe('bytesToHex', () => {
   it('converts bytes to lowercase hexadecimal', () => {

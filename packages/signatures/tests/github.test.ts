@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { verifyGitHubSignature } from './github.js'
+import { verifyGitHubSignature } from '../src/providers/github.js'
 
 const encoder = new TextEncoder()
 
