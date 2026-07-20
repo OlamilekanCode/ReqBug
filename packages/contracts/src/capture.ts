@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+export const MAX_INBOX_CAPTURE_COUNT = 50
+
 export const MAX_CAPTURE_BODY_BYTES = 256 * 1024
 
 export const CAPTURE_METHODS = [
