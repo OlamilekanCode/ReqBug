@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { bytesToHex, hexToBytes } from './bytes.js'
+import { bytesToHex, concatBytes, hexToBytes } from './bytes.js'
 
 describe('bytesToHex', () => {
   it('converts bytes to lowercase hexadecimal', () => {
@@ -11,6 +11,24 @@ describe('bytesToHex', () => {
 
   it('handles an empty byte array', () => {
     expect(bytesToHex(new Uint8Array())).toBe('')
+  })
+})
+
+describe('concatBytes', () => {
+  it('joins byte arrays in their original order', () => {
+    const result = concatBytes(
+      new Uint8Array([1, 2]),
+      new Uint8Array(),
+      new Uint8Array([3, 4]),
+    )
+
+    expect(result).toEqual(
+      new Uint8Array([1, 2, 3, 4]),
+    )
+  })
+
+  it('returns an empty array when no chunks are provided', () => {
+    expect(concatBytes()).toEqual(new Uint8Array())
   })
 })
 

@@ -6,6 +6,23 @@ export function bytesToHex(bytes: Uint8Array): string {
     ).join("")
 }
 
+export function concatBytes(...chunks: Uint8Array[]): Uint8Array {
+  const totalLength = chunks.reduce(
+    (length, chunk) => length + chunk.length,
+    0,
+  )
+
+  const result = new Uint8Array(totalLength)
+  let offset = 0
+
+  for (const chunk of chunks) {
+    result.set(chunk, offset)
+    offset += chunk.length
+  }
+
+  return result
+}
+
 export function hexToBytes(hex: string): Uint8Array | null {
     if (
         hex.length === 0 ||

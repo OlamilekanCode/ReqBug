@@ -1,5 +1,6 @@
 export {
   bytesToHex,
+  concatBytes,
   hexToBytes,
 } from './bytes.js'
 
@@ -14,3 +15,11 @@ export {
   type GitHubSignatureVerificationResult,
   type VerifyGitHubSignatureInput,
 } from './github.js'
+
+export {
+  DEFAULT_STRIPE_TOLERANCE_SECONDS,
+  verifyStripeSignature,
+  type StripeSignatureFailureReason,
+  type StripeSignatureVerificationResult,
+  type VerifyStripeSignatureInput,
+} from './stripe.js'
