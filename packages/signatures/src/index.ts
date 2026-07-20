@@ -57,3 +57,14 @@ export {
   type VerifyGenericHmacSha256SignatureInput,
 } from './providers/generic.js'
 
+export {
+  getSignatureProviderMetadata,
+  isSignatureProviderId,
+  SIGNATURE_PROVIDERS,
+  type FreshnessProtection,
+  type SecretSensitivity,
+  type SignatureAlgorithm,
+  type SignatureEncoding,
+  type SignatureProviderId,
+  type SignatureProviderMetadata,
+} from './providers/catalog.js'
