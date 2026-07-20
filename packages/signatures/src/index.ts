@@ -49,3 +49,11 @@ export {
   type VerifyFlutterwaveSignatureInput,
 } from './providers/flutterwave.js'
 
+export {
+  verifyGenericHmacSha256Signature,
+  type GenericHmacSignatureEncoding,
+  type GenericHmacSignatureFailureReason,
+  type GenericHmacSignatureVerificationResult,
+  type VerifyGenericHmacSha256SignatureInput,
+} from './providers/generic.js'
+
