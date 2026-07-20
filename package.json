@@ -1,0 +1,14 @@
+{
+  "name": "reqbug",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ephemeral webhook inspector and replay-safe debugger.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@11.15.1",
+  "engines": {
+    "node": ">=24.18.0 <25",
+    "pnpm": ">=11.15.1 <12"
+  },
+  "scripts": {}
+}
