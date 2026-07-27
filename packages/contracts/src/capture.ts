@@ -4,6 +4,10 @@ export const MAX_INBOX_CAPTURE_COUNT = 50
 
 export const MAX_CAPTURE_BODY_BYTES = 256 * 1024
 
+export const MAX_CAPTURE_HEADER_COUNT = 100
+
+export const MAX_CAPTURE_QUERY_ENTRY_COUNT = 100
+
 export const CAPTURE_METHODS = [
   'GET',
   'HEAD',
