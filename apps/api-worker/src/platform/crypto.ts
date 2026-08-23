@@ -6,7 +6,7 @@ import type {
 const INBOX_ID_BYTE_LENGTH = 16
 const CAPABILITY_BYTE_LENGTH = 32
 
-function bytesToBase64Url(
+export function bytesToBase64Url(
   bytes: Uint8Array,
 ): string {
   let binary = ''
@@ -19,6 +19,18 @@ function bytesToBase64Url(
     .replaceAll('+', '-')
     .replaceAll('/', '_')
     .replace(/=+$/u, '')
+}
+
+export async function sha256Bytes(
+  bytes: Uint8Array,
+): Promise<Uint8Array> {
+  const digest =
+    await crypto.subtle.digest(
+      'SHA-256',
+      bytes.slice().buffer,
+    )
+
+  return new Uint8Array(digest)
 }
 
 function generateSecureValue(
@@ -55,13 +67,9 @@ export class WebCryptoTokenDigestService
   async digest(
     token: string,
   ): Promise<Uint8Array> {
-    const digest =
-      await crypto.subtle.digest(
-        'SHA-256',
-        this.encoder.encode(token),
-      )
-
-    return new Uint8Array(digest)
+    return sha256Bytes(
+      this.encoder.encode(token),
+    )
   }
 
   async verify(
