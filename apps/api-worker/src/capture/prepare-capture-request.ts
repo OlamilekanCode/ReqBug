@@ -134,12 +134,12 @@ export async function prepareCaptureRequest({
       reason: 'method-not-allowed',
     }
   }
+  
+  const url = new URL(request.url)
 
-    const url = new URL(request.url)
-
-    const targetByteLength =
-        textEncoder.encode(
-        capturedPath + url.search,
+  const targetByteLength =
+  textEncoder.encode(
+    capturedPath + url.search,
         ).byteLength
 
     if (
@@ -237,11 +237,17 @@ export async function prepareCaptureRequest({
       'content-type',
     )
 
+  const parsedContentType =
+    rawContentType
+      ?.split(';', 1)[0]
+      ?.trim()
+      .toLowerCase()
+
   const contentType =
-    rawContentType === null ||
-    rawContentType.length === 0
+    parsedContentType === undefined ||
+    parsedContentType.length === 0
       ? null
-      : rawContentType
+      : parsedContentType
 
   if (
     contentType !== null &&

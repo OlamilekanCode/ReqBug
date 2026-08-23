@@ -249,4 +249,45 @@ describe('prepareCaptureRequest', () => {
         'too-many-query-entries',
     })
   })
+
+  it('normalizes the dedicated content type while preserving its header', async () => {
+    const result =
+      await prepareCaptureRequest({
+        request: new Request(
+          'https://reqbug.test/h/id/token',
+          {
+            method: 'POST',
+
+            headers: {
+              'content-type':
+                'Application/JSON; Charset=UTF-8',
+            },
+
+            body: '{}',
+          },
+        ),
+
+        capturedPath: '/',
+      })
+
+    expect(result.prepared).toBe(true)
+
+    if (!result.prepared) {
+      throw new Error(
+        'The request was unexpectedly rejected.',
+      )
+    }
+
+    expect(
+      result.capture.contentType,
+    ).toBe('application/json')
+
+    expect(
+      result.capture.headers,
+    ).toContainEqual({
+      name: 'content-type',
+      value:
+        'Application/JSON; Charset=UTF-8',
+    })
+  })
 })
