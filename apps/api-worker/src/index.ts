@@ -1,6 +1,7 @@
 import {
   CAPTURE_METHODS,
   CreateInboxResponseSchema,
+  InboxMetadataResponseSchema,
   MAX_CAPTURE_BODY_BYTES,
   MAX_INBOX_CAPTURE_COUNT,
 } from '@reqbug/contracts'
@@ -18,11 +19,16 @@ import {
 import {
   ReqBugInbox,
   type CaptureWebhookFailureReason,
+  type ReadInboxMetadataFailureReason,
 } from './inbox-object/reqbug-inbox.js'
 
 import {
   WebCryptoSecureValueGenerator,
 } from './platform/crypto.js'
+
+import {
+  getBearerCapability,
+} from './auth/bearer-capability.js'
 
 export {
   ReqBugInbox,
@@ -199,6 +205,32 @@ function persistenceFailureResponse(
         503,
         'CAPTURE_UNAVAILABLE',
         'The request could not be stored.',
+      )
+  }
+}
+
+function inboxReadFailureResponse(
+  method: string,
+  reason:
+    ReadInboxMetadataFailureReason,
+): Response {
+  switch (reason) {
+    case 'not-found':
+    case 'invalid-capability':
+      return captureError(
+        method,
+        404,
+        'NOT_FOUND',
+        'The requested webhook inbox was not found.',
+      )
+
+    case 'expired':
+    case 'deleted':
+      return captureError(
+        method,
+        410,
+        'INBOX_GONE',
+        'This webhook inbox is no longer available.',
       )
   }
 }
@@ -420,6 +452,99 @@ app.post(
       response,
       201,
     )
+  },
+)
+
+app.get(
+  '/api/v1/inboxes/:inboxId',
+  async (context) => {
+    const request =
+      context.req.raw
+
+    const inboxId =
+      context.req.param('inboxId')
+
+    const readToken =
+      getBearerCapability(request)
+
+    if (
+      inboxId === undefined ||
+      readToken === null
+    ) {
+      return captureError(
+        request.method,
+        404,
+        'NOT_FOUND',
+        'The requested webhook inbox was not found.',
+      )
+    }
+
+    const inbox =
+      context.env.INBOXES.getByName(
+        inboxId,
+      )
+
+    try {
+      const result =
+        await inbox.readInboxMetadata({
+          inboxId,
+          readToken,
+        })
+
+      if (!result.found) {
+        return inboxReadFailureResponse(
+          request.method,
+          result.reason,
+        )
+      }
+
+      const response =
+        InboxMetadataResponseSchema.parse({
+          data: {
+            inboxId:
+              result.metadata.inboxId,
+
+            createdAt:
+              new Date(
+                result.metadata.createdAtMs,
+              ).toISOString(),
+
+            expiresAt:
+              new Date(
+                result.metadata.expiresAtMs,
+              ).toISOString(),
+
+            status: 'active',
+
+            storedRequestCount:
+              result.metadata
+                .storedRequestCount,
+
+            lifetimeRequestCount:
+              result.metadata
+                .lifetimeRequestCount,
+
+            requestLimit:
+              MAX_INBOX_CAPTURE_COUNT,
+
+            bodyByteLimit:
+              MAX_CAPTURE_BODY_BYTES,
+          },
+        })
+
+      return jsonResponse(
+        request.method,
+        response,
+        200,
+      )
+    } catch {
+      return captureError(
+        request.method,
+        503,
+        'INBOX_UNAVAILABLE',
+        'The webhook inbox is temporarily unavailable.',
+      )
+    }
   },
 )
 

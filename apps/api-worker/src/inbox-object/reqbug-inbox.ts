@@ -42,6 +42,34 @@ export interface CaptureWebhookInput {
     PreparedCaptureRequest
 }
 
+export interface ReadInboxMetadataInput {
+  readonly inboxId: string
+  readonly readToken: string
+}
+
+export interface InboxMetadataSnapshot {
+  readonly inboxId: string
+  readonly createdAtMs: number
+  readonly expiresAtMs: number
+  readonly storedRequestCount: number
+  readonly lifetimeRequestCount: number
+}
+
+export type ReadInboxMetadataFailureReason =
+  InboxAuthorizationFailureReason
+
+export type ReadInboxMetadataResult =
+  | {
+      readonly found: true
+      readonly metadata:
+        InboxMetadataSnapshot
+    }
+  | {
+      readonly found: false
+      readonly reason:
+        ReadInboxMetadataFailureReason
+    }
+
 export type CaptureWebhookFailureReason =
   | InboxAuthorizationFailureReason
   | CapturePersistenceFailureReason
@@ -145,6 +173,64 @@ export class ReqBugInbox
       expiry:
         this.expiry,
     })
+  }
+
+  async readInboxMetadata({
+    inboxId,
+    readToken,
+  }: ReadInboxMetadataInput): Promise<ReadInboxMetadataResult> {
+    const authorization =
+      await authorizeInbox(
+        {
+          clock: this.clock,
+
+          tokenDigests:
+            this.tokenDigests,
+
+          inboxes:
+            this.repository,
+        },
+        {
+          inboxId,
+
+          capabilityToken:
+            readToken,
+
+          capability: 'read',
+        },
+      )
+
+    if (!authorization.authorized) {
+      return {
+        found: false,
+        reason:
+          authorization.reason,
+      }
+    }
+
+    const inbox =
+      authorization.inbox
+
+    return {
+      found: true,
+
+      metadata: {
+        inboxId:
+          inbox.inboxId,
+
+        createdAtMs:
+          inbox.createdAtMs,
+
+        expiresAtMs:
+          inbox.expiresAtMs,
+
+        storedRequestCount:
+          inbox.storedRequestCount,
+
+        lifetimeRequestCount:
+          inbox.lifetimeRequestCount,
+      },
+    }
   }
 
   async captureWebhook({
