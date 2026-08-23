@@ -1,6 +1,15 @@
+import type {
+  CaptureMethod,
+  CapturedHeader,
+  CapturedQueryEntry,
+} from '@reqbug/contracts'
+
 import {
+  DEFAULT_INBOX_POLICY,
   InboxCoreError,
+  assessCaptureAdmission,
   isValidStoredInboxState,
+  type CaptureAdmissionFailureReason,
   type InboxLifecycleRepository,
   type StoredInbox,
 } from '@reqbug/core'
@@ -33,6 +42,38 @@ interface StoredRequestCountRow
   > {
   stored_request_count: number
 }
+
+export interface StoredCaptureInput {
+  readonly inboxId: string
+  readonly id: string
+  readonly receivedAtMs: number
+  readonly method: CaptureMethod
+  readonly path: string
+  readonly query:
+    readonly CapturedQueryEntry[]
+  readonly headers:
+    readonly CapturedHeader[]
+  readonly contentType: string | null
+  readonly body: Uint8Array
+  readonly bodySha256: Uint8Array
+  readonly retryGroupKey: string
+}
+
+export type CapturePersistenceFailureReason =
+  | CaptureAdmissionFailureReason
+  | 'inbox-not-found'
+
+export type CapturePersistenceResult =
+  | {
+      readonly stored: true
+      readonly requestId: string
+      readonly sequence: number
+    }
+  | {
+      readonly stored: false
+      readonly reason:
+        CapturePersistenceFailureReason
+    }
 
 function toStoredInbox(
   row: InboxMetaRow,
@@ -219,6 +260,134 @@ export class SqliteInboxRepository
     return row === undefined
       ? null
       : toStoredInbox(row)
+  }
+
+  async insertCapture(
+    input: StoredCaptureInput,
+  ): Promise<CapturePersistenceResult> {
+    this.ensureSchema()
+
+    return this.storage
+      .transactionSync(() => {
+        const row =
+          this.findMetaRow(
+            input.inboxId,
+          )
+
+        if (row === undefined) {
+          return {
+            stored: false,
+            reason: 'inbox-not-found',
+          }
+        }
+
+        const inbox =
+          toStoredInbox(row)
+
+        const admission =
+          assessCaptureAdmission({
+            inbox,
+            nowMs:
+              input.receivedAtMs,
+            bodyByteLength:
+              input.body.byteLength,
+            policy:
+              DEFAULT_INBOX_POLICY,
+          })
+
+        if (!admission.admitted) {
+          return {
+            stored: false,
+            reason:
+              admission.reason,
+          }
+        }
+
+        this.sql.exec(
+          `
+            INSERT INTO captured_requests (
+              id,
+              sequence,
+              received_at_ms,
+              method,
+              path,
+              query_json,
+              headers_json,
+              content_type,
+              body,
+              body_size,
+              body_sha256,
+              source_kind,
+              source_confidence,
+              source_evidence_json,
+              delivery_id,
+              event_id,
+              retry_group_key,
+              retry_classification
+            ) VALUES (
+              ?,
+              ?,
+              ?,
+              ?,
+              ?,
+              ?,
+              ?,
+              ?,
+              ?,
+              ?,
+              ?,
+              NULL,
+              NULL,
+              '[]',
+              NULL,
+              NULL,
+              ?,
+              'unique'
+            )
+          `,
+          input.id,
+          admission.sequence,
+          input.receivedAtMs,
+          input.method,
+          input.path,
+          JSON.stringify(input.query),
+          JSON.stringify(input.headers),
+          input.contentType,
+          input.body.slice().buffer,
+          input.body.byteLength,
+          input.bodySha256
+            .slice()
+            .buffer,
+          input.retryGroupKey,
+        )
+
+        this.sql.exec(
+          `
+            UPDATE inbox_meta
+            SET
+              stored_request_count = ?,
+              lifetime_request_count = ?,
+              next_sequence = ?
+            WHERE
+              singleton_id = 1 AND
+              inbox_id = ?
+          `,
+          admission.nextInbox
+            .storedRequestCount,
+          admission.nextInbox
+            .lifetimeRequestCount,
+          admission.nextInbox
+            .nextSequence,
+          input.inboxId,
+        )
+
+        return {
+          stored: true,
+          requestId: input.id,
+          sequence:
+            admission.sequence,
+        }
+      })
   }
 
   async clearRequestsById(

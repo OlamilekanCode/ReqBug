@@ -8,7 +8,7 @@ ReqBug gives developers a temporary HTTPS inbox for inspecting webhook requests,
 
 ReqBug is under active development and is not yet deployed for public use.
 
-The backend foundation is complete through secure inbox creation and Durable Object SQLite persistence. Webhook ingestion is the next milestone.
+The backend foundation now includes secure inbox creation and authenticated, exact-byte webhook ingestion backed by Durable Object SQLite. Authenticated request-reading APIs are the next milestone.
 
 ### Current progress
 
@@ -20,14 +20,14 @@ The backend foundation is complete through secure inbox creation and Durable Obj
 | Inbox lifecycle and quota policy | Complete |
 | Durable Object SQLite persistence | Complete |
 | Secure inbox creation API | Complete |
-| Webhook request ingestion | In progress |
-| Authenticated request API | Planned |
+| Webhook request ingestion | Complete |
+| Authenticated request API | Next |
 | Live request updates | Planned |
 | React inspection dashboard | Planned |
 | Replay-pack generation | Planned |
 | Deployment and CI | Planned |
 
-The repository currently contains **175 passing Vitest tests** across the contracts, core, signatures, and API Worker packages.
+The repository currently contains **197 passing Vitest tests** across the contracts, core, signatures, and API Worker packages.
 
 ## Why ReqBug?
 
@@ -91,6 +91,11 @@ The provider catalog also records algorithms, encodings, expected headers, fresh
 - Durable inbox initialization before responding
 - Expiration alarm scheduling
 - Security response headers
+- Authenticated public webhook-ingestion routes
+- Bounded streaming request-body capture
+- Exact body-byte and SHA-256 preservation
+- Atomic capture insertion and quota advancement
+- Provider-facing 200, 404, 405, 410, 413, 414, 429, 431, and 503 responses
 
 ## MVP limits
 
