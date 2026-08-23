@@ -1,5 +1,7 @@
 # ReqBug
 
+[![Continuous integration](https://github.com/OlamilekanCode/ReqBug/actions/workflows/ci.yml/badge.svg)](https://github.com/OlamilekanCode/ReqBug/actions/workflows/ci.yml)
+
 > Ephemeral webhook inspector and replay-safe debugger.
 
 ReqBug gives developers a temporary HTTPS inbox for inspecting webhook requests, validating provider signatures against exact request bytes, identifying retries, and generating safe local replay artifacts.
