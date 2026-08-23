@@ -43,6 +43,59 @@ interface StoredRequestCountRow
   stored_request_count: number
 }
 
+interface CaptureListRow
+  extends Record<
+    string,
+    SqlStorageValue
+  > {
+  id: string
+  sequence: number
+  received_at_ms: number
+  method: string
+  path: string
+  content_type: string | null
+  body_size: number
+  body_sha256: ArrayBuffer
+  source_kind: string | null
+  source_confidence: string | null
+  source_evidence_json: string
+  delivery_id: string | null
+  event_id: string | null
+  retry_group_key: string
+  retry_classification: string
+  retry_attempt: number
+  retry_group_size: number
+}
+
+export interface StoredCaptureSummary {
+  readonly id: string
+  readonly sequence: number
+  readonly receivedAtMs: number
+  readonly method: CaptureMethod
+  readonly path: string
+  readonly contentType: string | null
+  readonly bodyBytes: number
+  readonly bodySha256: Uint8Array
+  readonly sourceKind: string | null
+  readonly sourceConfidence: string | null
+  readonly sourceEvidence: unknown
+  readonly deliveryId: string | null
+  readonly eventId: string | null
+
+  readonly retry: {
+    readonly groupKey: string
+    readonly classification: string
+    readonly attempt: number
+    readonly groupSize: number
+  }
+}
+
+export interface StoredCaptureSummaryPage {
+  readonly captures:
+    readonly StoredCaptureSummary[]
+  readonly nextBefore: number | null
+}
+
 export interface StoredCaptureInput {
   readonly inboxId: string
   readonly id: string
@@ -388,6 +441,194 @@ export class SqliteInboxRepository
             admission.sequence,
         }
       })
+  }
+
+    listCaptureSummaries({
+    before,
+    limit,
+  }: {
+    readonly before: number | null
+    readonly limit: number
+  }): StoredCaptureSummaryPage {
+    this.ensureSchema()
+
+    if (
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > 50
+    ) {
+      throw new Error(
+        'Capture list limit is invalid.',
+      )
+    }
+
+    if (
+      before !== null &&
+      (
+        !Number.isInteger(before) ||
+        before < 1
+      )
+    ) {
+      throw new Error(
+        'Capture list cursor is invalid.',
+      )
+    }
+
+    const requestedRowCount =
+      limit + 1
+
+    const rows =
+      this.sql
+        .exec<CaptureListRow>(
+          `
+            WITH ranked_captures AS (
+              SELECT
+                id,
+                sequence,
+                received_at_ms,
+                method,
+                path,
+                content_type,
+                body_size,
+                body_sha256,
+                source_kind,
+                source_confidence,
+                source_evidence_json,
+                delivery_id,
+                event_id,
+                retry_group_key,
+                retry_classification,
+
+                CASE
+                  WHEN retry_classification =
+                    'unique'
+                  THEN 1
+                  ELSE ROW_NUMBER() OVER (
+                    PARTITION BY
+                      retry_group_key
+                    ORDER BY
+                      sequence ASC
+                  )
+                END AS retry_attempt,
+
+                CASE
+                  WHEN retry_classification =
+                    'unique'
+                  THEN 1
+                  ELSE COUNT(*) OVER (
+                    PARTITION BY
+                      retry_group_key
+                  )
+                END AS retry_group_size
+              FROM captured_requests
+            )
+            SELECT
+              id,
+              sequence,
+              received_at_ms,
+              method,
+              path,
+              content_type,
+              body_size,
+              body_sha256,
+              source_kind,
+              source_confidence,
+              source_evidence_json,
+              delivery_id,
+              event_id,
+              retry_group_key,
+              retry_classification,
+              retry_attempt,
+              retry_group_size
+            FROM ranked_captures
+            WHERE
+              ? IS NULL OR
+              sequence < ?
+            ORDER BY
+              sequence DESC
+            LIMIT ?
+          `,
+          before,
+          before,
+          requestedRowCount,
+        )
+        .toArray()
+
+    const hasNextPage =
+      rows.length > limit
+
+    const pageRows =
+      rows.slice(0, limit)
+
+    const captures =
+      pageRows.map(
+        (row): StoredCaptureSummary => ({
+          id: row.id,
+          sequence: row.sequence,
+          receivedAtMs:
+            row.received_at_ms,
+
+          method:
+            row.method as CaptureMethod,
+
+          path: row.path,
+
+          contentType:
+            row.content_type,
+
+          bodyBytes:
+            row.body_size,
+
+          bodySha256:
+            new Uint8Array(
+              row.body_sha256,
+            ).slice(),
+
+          sourceKind:
+            row.source_kind,
+
+          sourceConfidence:
+            row.source_confidence,
+
+          sourceEvidence:
+            JSON.parse(
+              row.source_evidence_json,
+            ),
+
+          deliveryId:
+            row.delivery_id,
+
+          eventId:
+            row.event_id,
+
+          retry: {
+            groupKey:
+              row.retry_group_key,
+
+            classification:
+              row.retry_classification,
+
+            attempt:
+              row.retry_attempt,
+
+            groupSize:
+              row.retry_group_size,
+          },
+        }),
+      )
+
+    const lastCapture =
+      captures.at(-1)
+
+    return {
+      captures,
+
+      nextBefore:
+        hasNextPage &&
+        lastCapture !== undefined
+          ? lastCapture.sequence
+          : null,
+    }
   }
 
   async clearRequestsById(

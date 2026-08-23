@@ -1,4 +1,9 @@
 import {
+  CaptureSummarySchema,
+  type CaptureSummary,
+} from '@reqbug/contracts'
+
+import {
   DEFAULT_INBOX_POLICY,
   authorizeInbox,
   createInbox,
@@ -68,6 +73,26 @@ export type ReadInboxMetadataResult =
       readonly found: false
       readonly reason:
         ReadInboxMetadataFailureReason
+    }
+
+export interface ListInboxCapturesInput {
+  readonly inboxId: string
+  readonly readToken: string
+  readonly before: number | null
+  readonly limit: number
+}
+
+export type ListInboxCapturesResult =
+  | {
+      readonly found: true
+      readonly captures:
+        readonly CaptureSummary[]
+      readonly nextBefore: number | null
+    }
+  | {
+      readonly found: false
+      readonly reason:
+        InboxAuthorizationFailureReason
     }
 
 export type CaptureWebhookFailureReason =
@@ -230,6 +255,129 @@ export class ReqBugInbox
         lifetimeRequestCount:
           inbox.lifetimeRequestCount,
       },
+    }
+  }
+  
+  async listInboxCaptures({
+    inboxId,
+    readToken,
+    before,
+    limit,
+  }: ListInboxCapturesInput): Promise<ListInboxCapturesResult> {
+    const authorization =
+      await authorizeInbox(
+        {
+          clock: this.clock,
+
+          tokenDigests:
+            this.tokenDigests,
+
+          inboxes:
+            this.repository,
+        },
+        {
+          inboxId,
+
+          capabilityToken:
+            readToken,
+
+          capability: 'read',
+        },
+      )
+
+    if (!authorization.authorized) {
+      return {
+        found: false,
+        reason:
+          authorization.reason,
+      }
+    }
+
+    const page =
+      this.repository
+        .listCaptureSummaries({
+          before,
+          limit,
+        })
+
+    const captures =
+      page.captures.map(
+        (capture) =>
+          CaptureSummarySchema.parse({
+            id: capture.id,
+            sequence:
+              capture.sequence,
+
+            receivedAt:
+              new Date(
+                capture.receivedAtMs,
+              ).toISOString(),
+
+            method:
+              capture.method,
+
+            path:
+              capture.path,
+
+            contentType:
+              capture.contentType,
+
+            bodyBytes:
+              capture.bodyBytes,
+
+            bodySha256:
+              bytesToBase64Url(
+                capture.bodySha256,
+              ),
+
+            source:
+              capture.sourceKind === null
+                ? {
+                    kind: 'unknown',
+                    confidence: null,
+                    evidence: [],
+                  }
+                : {
+                    kind:
+                      capture.sourceKind,
+
+                    confidence:
+                      capture
+                        .sourceConfidence,
+
+                    evidence:
+                      capture
+                        .sourceEvidence,
+                  },
+
+            deliveryId:
+              capture.deliveryId,
+
+            eventId:
+              capture.eventId,
+
+            retry: {
+              groupKey:
+                capture.retry.groupKey,
+
+              classification:
+                capture.retry
+                  .classification,
+
+              attempt:
+                capture.retry.attempt,
+
+              groupSize:
+                capture.retry.groupSize,
+            },
+          }),
+      )
+
+    return {
+      found: true,
+      captures,
+      nextBefore:
+        page.nextBefore,
     }
   }
 
