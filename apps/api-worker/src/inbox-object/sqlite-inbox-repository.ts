@@ -110,9 +110,12 @@ export class SqliteInboxRepository
   }
 
   private findMetaRow(
-    inboxId: string,
+    inboxId?: string,
   ): InboxMetaRow | undefined {
     this.ensureSchema()
+
+    const inboxIdFilter =
+      inboxId ?? null
 
     return this.sql
       .exec<InboxMetaRow>(
@@ -131,9 +134,13 @@ export class SqliteInboxRepository
           FROM inbox_meta
           WHERE
             singleton_id = 1 AND
-            inbox_id = ?
+            (
+              ? IS NULL OR
+              inbox_id = ?
+            )
         `,
-        inboxId,
+        inboxIdFilter,
+        inboxIdFilter,
       )
       .toArray()[0]
   }
@@ -200,6 +207,14 @@ export class SqliteInboxRepository
   ): Promise<StoredInbox | null> {
     const row =
       this.findMetaRow(inboxId)
+
+    return row === undefined
+      ? null
+      : toStoredInbox(row)
+  }
+
+  async findCurrent(): Promise<StoredInbox | null> {
+    const row = this.findMetaRow()
 
     return row === undefined
       ? null

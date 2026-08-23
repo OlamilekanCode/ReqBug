@@ -10,6 +10,9 @@ importers:
 
   apps/api-worker:
     dependencies:
+      '@reqbug/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@reqbug/core':
         specifier: workspace:*
         version: link:../../packages/core
