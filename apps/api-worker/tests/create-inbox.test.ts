@@ -124,6 +124,45 @@ describe('POST /api/v1/inboxes', () => {
       },
     )
   })
+  
+  it('supports the local Wrangler HTTP origin', async () => {
+    const response =
+      await exports.default.fetch(
+        new Request(
+          'http://127.0.0.1:8787/api/v1/inboxes',
+          {
+            method: 'POST',
+          },
+        ),
+      )
+
+    expect(response.status).toBe(201)
+
+    const result =
+      CreateInboxResponseSchema.parse(
+        await response.json(),
+      )
+
+    const ingestUrl =
+      new URL(result.data.ingestUrl)
+
+    const dashboardUrl =
+      new URL(
+        result.data.dashboardUrl,
+      )
+
+    expect(ingestUrl.protocol).toBe(
+      'http:',
+    )
+
+    expect(ingestUrl.host).toBe(
+      '127.0.0.1:8787',
+    )
+
+    expect(dashboardUrl.origin).toBe(
+      ingestUrl.origin,
+    )
+  })
 })
 
 describe('ReqBugInbox alarm', () => {

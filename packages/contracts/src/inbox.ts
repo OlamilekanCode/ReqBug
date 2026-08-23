@@ -54,21 +54,34 @@ export const SafeApiMessageSchema = z
     },
   )
 
-const HttpsUrlSchema = z
+const SecureApplicationUrlSchema = z
   .url()
   .refine(
     (value) => {
       const url = new URL(value)
 
+      const isLoopbackHost =
+        url.hostname === 'localhost' ||
+        url.hostname === '127.0.0.1' ||
+        url.hostname === '[::1]' ||
+        url.hostname === '::1'
+
+      const hasAllowedProtocol =
+        url.protocol === 'https:' ||
+        (
+          url.protocol === 'http:' &&
+          isLoopbackHost
+        )
+
       return (
-        url.protocol === 'https:' &&
+        hasAllowedProtocol &&
         url.username.length === 0 &&
         url.password.length === 0
       )
     },
     {
       message:
-        'URL must use HTTPS and must not contain credentials',
+        'URL must use HTTPS, except for local loopback HTTP, and must not contain credentials',
     },
   )
 
@@ -89,8 +102,8 @@ function hasValidInboxLifetime(
 export const CreateInboxDataSchema = z
   .object({
     inboxId: InboxIdSchema,
-    ingestUrl: HttpsUrlSchema,
-    dashboardUrl: HttpsUrlSchema,
+    ingestUrl: SecureApplicationUrlSchema,
+    dashboardUrl: SecureApplicationUrlSchema,
     readToken: CapabilityTokenSchema,
     createdAt: UtcDateTimeSchema,
     expiresAt: UtcDateTimeSchema,

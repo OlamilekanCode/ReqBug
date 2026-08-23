@@ -94,6 +94,46 @@ describe('CreateInboxResponseSchema', () => {
 
     expect(result.success).toBe(false)
   })
+
+  it('allows HTTP for local loopback development', () => {
+    const result =
+      CreateInboxResponseSchema.safeParse({
+        data: {
+          ...validCreateResponse.data,
+
+          ingestUrl:
+            `http://127.0.0.1:8787/h/` +
+            `${inboxId}/${ingestToken}`,
+
+          dashboardUrl:
+            `http://127.0.0.1:8787/inboxes/` +
+            `${inboxId}` +
+            `#access=${readToken}`,
+        },
+      })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects HTTP for a non-local host', () => {
+    const result =
+      CreateInboxResponseSchema.safeParse({
+        data: {
+          ...validCreateResponse.data,
+
+          ingestUrl:
+            `http://reqbug.example/h/` +
+            `${inboxId}/${ingestToken}`,
+
+          dashboardUrl:
+            `http://reqbug.example/inboxes/` +
+            `${inboxId}` +
+            `#access=${readToken}`,
+        },
+      })
+
+    expect(result.success).toBe(false)
+  })
 })
 
 describe('InboxMetadataResponseSchema', () => {
