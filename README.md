@@ -2,82 +2,254 @@
 
 > Ephemeral webhook inspector and replay-safe debugger.
 
-ReqBug is a temporary webhook inbox that helps developers inspect exactly what a webhook provider sent, verify signatures against the original request bytes, identify retries, and safely reproduce requests against a local or sandbox endpoint.
+ReqBug gives developers a temporary HTTPS inbox for inspecting webhook requests, validating provider signatures against exact request bytes, identifying retries, and generating safe local replay artifacts.
 
 ## Project status
 
-ReqBug is under active development.
+ReqBug is under active development and is not yet deployed for public use.
 
-The monorepo foundation, inbox policy, browser-safe signature engine, provider catalog, and core capture contracts are implemented and tested. Durable Object persistence, Worker routes, the live dashboard, and replay-pack generation are the next major milestones.
+The backend foundation is complete through secure inbox creation and Durable Object SQLite persistence. Webhook ingestion is the next milestone.
 
-ReqBug is not yet deployed for public use.
+### Current progress
+
+| Milestone | Status |
+|---|---|
+| TypeScript pnpm monorepo | Complete |
+| Capture and API contracts | Complete |
+| Provider signature verification | Complete |
+| Inbox lifecycle and quota policy | Complete |
+| Durable Object SQLite persistence | Complete |
+| Secure inbox creation API | Complete |
+| Webhook request ingestion | In progress |
+| Authenticated request API | Planned |
+| Live request updates | Planned |
+| React inspection dashboard | Planned |
+| Replay-pack generation | Planned |
+| Deployment and CI | Planned |
+
+The repository currently contains **175 passing Vitest tests** across the contracts, core, signatures, and API Worker packages.
 
 ## Why ReqBug?
 
-Webhook debugging often requires several disconnected tools:
+Webhook debugging usually requires several disconnected tools:
 
-- A temporary HTTPS endpoint.
-- Raw request inspection.
-- Provider-specific signature verification.
-- Retry and duplicate analysis.
-- A safe way to reproduce requests locally.
+- A temporary public HTTPS endpoint
+- Raw request inspection
+- Provider-specific signature verification
+- Retry and duplicate analysis
+- A safe way to reproduce requests locally
 
-ReqBug combines these workflows while keeping signing secrets in the browser and avoiding hosted outbound replay.
+ReqBug combines those workflows while keeping signing secrets in the browser and avoiding hosted outbound replay.
 
 ## Implemented
 
-- pnpm TypeScript monorepo
-- React frontend scaffold
-- Cloudflare Worker and Hono API scaffold
-- Framework-neutral inbox policy
-- Exact-byte HMAC verification primitives
-- GitHub webhook verification
-- Stripe timestamped-signature verification
-- Shopify webhook verification
-- Paystack webhook verification
-- Current Flutterwave HMAC webhook verification
-- Configurable generic HMAC-SHA256 verification
-- Provider verification metadata catalog
-- Validated capture summary, detail, feed, inbox, and live-event contracts
-- Automated Vitest coverage for implemented packages
+### Contracts
 
-## Planned MVP
+- Versioned Zod API contracts
+- Capture summaries and request details
+- Inbox creation and metadata responses
+- Paginated capture feeds
+- Live event envelopes
+- Strict request limits and validation
+- Repeated header and query-entry preservation
+
+### Signature verification
+
+Browser-safe verification is implemented for:
+
+- GitHub
+- Stripe timestamped signatures
+- Shopify
+- Paystack
+- Current Flutterwave HMAC webhooks
+- Configurable generic HMAC-SHA256 webhooks
+
+The provider catalog also records algorithms, encodings, expected headers, freshness protection, duplicate-delivery headers, and security warnings.
+
+### Inbox domain
 
 - Anonymous capability-based inboxes
 - Separate ingest and read capabilities
-- 24-hour maximum inbox lifetime
+- Cryptographically secure identifiers and tokens
+- SHA-256 token-digest storage
+- Constant-time capability comparison
+- 24-hour maximum lifetime
 - 50 lifetime captures per inbox
-- 256 KiB maximum request body
-- Exact request-body preservation
-- Live request updates through Durable Object WebSockets
-- Request metadata, header, query, text, JSON, and binary inspection
-- Provider and event-identifier detection
-- Definite and probable retry grouping
-- Browser-only signature diagnostics
-- Downloadable exact request bodies
-- Safe local `curl` and `.http` replay artifacts
-- Clear-now and delete-now controls
+- 256 KiB request-body limit
+- Clear, delete, expiration, and capture-admission policies
+- Durable Object expiration alarms
 
-## Security boundaries
+### Cloudflare persistence and API
 
-ReqBug is designed for synthetic and sandbox webhook data.
+- Hono API Worker
+- SQLite-backed Durable Object
+- Inbox metadata schema
+- Captured-request schema
+- Live-ticket schema
+- Transactional lifecycle operations
+- Secure `POST /api/v1/inboxes` endpoint
+- Durable inbox initialization before responding
+- Expiration alarm scheduling
+- Security response headers
 
-- Signing secrets never leave the browser.
-- Only token digests are stored by the backend.
+## MVP limits
+
+| Limit | Value |
+|---|---:|
+| Inbox lifetime | 24 hours |
+| Lifetime captures per inbox | 50 |
+| Maximum request body | 256 KiB |
+| Maximum captured headers | 100 |
+| Combined path and query size | 8 KiB |
+| Concurrent live connections | 3 |
+| Live-ticket lifetime | 30 seconds |
+
+Clearing an inbox removes its currently stored captures but does not reset its lifetime capture quota.
+
+Oversized request bodies are rejected and never partially stored.
+
+## Security model
+
+ReqBug is intended for synthetic and sandbox webhook data.
+
+- Inbox access uses unguessable capabilities instead of accounts.
+- Ingest and read capabilities are separate.
+- Only SHA-256 capability digests are persisted.
 - Read capabilities are delivered through URL fragments.
+- Signing secrets remain inside the browser.
+- Signature verification uses the exact captured body bytes.
 - Captured data expires after at most 24 hours.
 - Hosted forwarding to arbitrary destinations is excluded.
 - Captured HTML and SVG are never executed.
-- Durable storage must commit before ReqBug acknowledges a delivery.
+- Durable storage must commit before a webhook receives a success response.
+- Production API keys and application secrets should not be entered into hosted debugging tools.
 
 ## Architecture
 
 ```text
 apps/
-  web/             React and Vite dashboard
-  api-worker/      Hono and Cloudflare Worker boundary
+  web/             React and Vite inspection dashboard
+  api-worker/      Hono API and Cloudflare Durable Object
 
 packages/
   contracts/       Versioned Zod API and live-event contracts
-  core/            Framework-neutral domain policy
-  signatures/      Browser-safe signature verification
+  core/            Framework-neutral inbox domain policy
+  signatures/      Browser-safe provider signature verification
+```
+
+The intended request flow is:
+
+```text
+Webhook provider
+       |
+       v
+Cloudflare Worker
+       |
+       v
+Inbox Durable Object
+       |
+       +--> SQLite metadata and exact request bytes
+       |
+       +--> Live dashboard events
+```
+
+## API implemented so far
+
+### Create an inbox
+
+```http
+POST /api/v1/inboxes
+```
+
+The response contains:
+
+- A public ingest URL
+- A private dashboard URL
+- A separate read capability
+- Creation and expiration timestamps
+- The inbox capture and body-size limits
+
+The raw capabilities are returned only during creation. The backend stores their SHA-256 digests.
+
+## Planned MVP workflow
+
+1. Create an anonymous temporary inbox.
+2. Copy its unique ingest URL into a webhook provider’s sandbox.
+3. Receive and durably store exact webhook request bytes.
+4. Inspect method, path, query parameters, headers, content type, and body.
+5. Detect likely providers, event identifiers, retries, and duplicates.
+6. Verify supported signatures locally in the browser.
+7. Download the exact captured body.
+8. Generate local `curl` and `.http` replay artifacts.
+9. Clear or permanently delete the inbox.
+
+## Explicit non-goals
+
+The MVP will not include:
+
+- User accounts
+- Permanent webhook storage
+- Hosted forwarding or server-side replay
+- Production secret management
+- Arbitrary JavaScript execution
+- A general-purpose API proxy
+- Automatic retrying of provider deliveries
+
+## Development
+
+### Requirements
+
+- Node.js `>=24.18.0 <25`
+- pnpm `>=11.15.1 <12`
+
+### Install dependencies
+
+```bash
+pnpm install
+```
+
+### Start the API Worker
+
+```bash
+pnpm --filter @reqbug/api-worker dev
+```
+
+### Start the web application
+
+```bash
+pnpm --filter @reqbug/web dev
+```
+
+### Verify the implemented packages
+
+```bash
+pnpm --filter @reqbug/contracts typecheck
+pnpm --filter @reqbug/contracts test
+
+pnpm --filter @reqbug/core typecheck
+pnpm --filter @reqbug/core test
+
+pnpm --filter @reqbug/signatures typecheck
+pnpm --filter @reqbug/signatures test
+
+pnpm --filter @reqbug/api-worker typecheck
+pnpm --filter @reqbug/api-worker test
+```
+
+## Technology
+
+- TypeScript
+- React
+- Vite
+- Hono
+- Cloudflare Workers
+- Cloudflare Durable Objects
+- SQLite
+- Zod
+- Web Crypto API
+- Vitest
+- pnpm workspaces
+
+## License
+
+[MIT](LICENSE)
