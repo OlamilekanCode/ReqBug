@@ -10,6 +10,7 @@ export {
   isValidCapabilityToken,
   isValidInboxId,
   isValidInboxPolicy,
+  isValidStoredInboxState,
   isValidTimestamp,
   isValidTokenDigest,
   type CreatedInboxCapabilities,

@@ -1,9 +1,22 @@
 import { Hono } from 'hono'
 
-const app = new Hono()
+import {
+  ReqBugInbox,
+} from './inbox-object/reqbug-inbox.js'
 
-app.get('/', (c) => {
-  return c.text('Hello Hono!')
+export {
+  ReqBugInbox,
+}
+
+const app = new Hono<{
+  Bindings: CloudflareBindings
+}>()
+
+app.get('/', (context) => {
+  return context.json({
+    service: 'reqbug-api',
+    status: 'ok',
+  })
 })
 
 export default app
