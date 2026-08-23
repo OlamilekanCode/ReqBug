@@ -101,7 +101,10 @@ export function getInboxAvailability(
   nowMs: number,
 ): InboxAvailability {
   if (inbox.deletedAtMs !== null) {
-    return 'deleted'
+    return inbox.deletedAtMs >=
+      inbox.expiresAtMs
+      ? 'expired'
+      : 'deleted'
   }
 
   if (nowMs >= inbox.expiresAtMs) {
@@ -109,4 +112,54 @@ export function getInboxAvailability(
   }
 
   return 'active'
+}
+
+export function isValidStoredInboxState(
+  inbox: StoredInbox,
+): boolean {
+  const validCounters =
+    Number.isSafeInteger(
+      inbox.storedRequestCount,
+    ) &&
+    inbox.storedRequestCount >= 0 &&
+    Number.isSafeInteger(
+      inbox.lifetimeRequestCount,
+    ) &&
+    inbox.lifetimeRequestCount >= 0 &&
+    inbox.storedRequestCount <=
+      inbox.lifetimeRequestCount &&
+    Number.isSafeInteger(
+      inbox.nextSequence,
+    ) &&
+    inbox.nextSequence ===
+      inbox.lifetimeRequestCount + 1
+
+  const validTimes =
+    isValidTimestamp(inbox.createdAtMs) &&
+    isValidTimestamp(inbox.expiresAtMs) &&
+    inbox.expiresAtMs >
+      inbox.createdAtMs &&
+    (
+      inbox.deletedAtMs === null ||
+      (
+        isValidTimestamp(
+          inbox.deletedAtMs,
+        ) &&
+        inbox.deletedAtMs >=
+          inbox.createdAtMs
+      )
+    )
+
+  return (
+    inbox.schemaVersion === 1 &&
+    isValidInboxId(inbox.inboxId) &&
+    isValidTokenDigest(
+      inbox.ingestTokenHash,
+    ) &&
+    isValidTokenDigest(
+      inbox.readTokenHash,
+    ) &&
+    validCounters &&
+    validTimes
+  )
 }

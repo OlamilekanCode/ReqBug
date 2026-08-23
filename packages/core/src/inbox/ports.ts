@@ -40,3 +40,37 @@ export interface ExpiryScheduler {
     readonly expiresAtMs: number
   }): Promise<void>
 }
+
+export interface ClearStoredRequestsResult {
+  readonly clearedRequestCount: number
+}
+
+export interface InboxLifecycleRepository
+  extends InboxRepository {
+  clearRequestsById(
+    inboxId: string,
+  ): Promise<ClearStoredRequestsResult>
+
+  markDeleted(input: {
+    readonly inboxId: string
+    readonly deletedAtMs: number
+  }): Promise<void>
+}
+
+export type InboxTerminationReason =
+  | 'deleted'
+  | 'expired'
+
+export interface InboxLifecycleNotifier {
+  publishInboxCleared(input: {
+    readonly inboxId: string
+    readonly clearedAtMs: number
+  }): Promise<void>
+
+  terminateInbox(input: {
+    readonly inboxId: string
+    readonly reason:
+      InboxTerminationReason
+    readonly occurredAtMs: number
+  }): Promise<void>
+}

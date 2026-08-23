@@ -43,3 +43,28 @@ export {
   type InboxAuthorizationFailureReason,
   type InboxAuthorizationResult,
 } from './inbox/authorize-inbox.js'
+
+export {
+  assessCaptureAdmission,
+  type AssessCaptureAdmissionInput,
+  type CaptureAdmissionFailureReason,
+  type CaptureAdmissionResult,
+} from './inbox/capture-admission.js'
+
+export {
+  clearInboxRequests,
+  deleteInbox,
+  expireInbox,
+  type AuthorizedLifecycleInput,
+  type ClearInboxRequestsResult,
+  type DeleteInboxResult,
+  type ExpireInboxResult,
+  type InboxLifecycleDependencies,
+} from './inbox/lifecycle.js'
+
+export type {
+  ClearStoredRequestsResult,
+  InboxLifecycleNotifier,
+  InboxLifecycleRepository,
+  InboxTerminationReason,
+} from './inbox/ports.js'

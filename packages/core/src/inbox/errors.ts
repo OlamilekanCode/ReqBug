@@ -5,6 +5,7 @@ export type InboxCoreErrorCode =
   | 'INVALID_GENERATED_CAPABILITY'
   | 'DUPLICATE_GENERATED_CAPABILITY'
   | 'INVALID_TOKEN_DIGEST'
+  | 'INVALID_INBOX_STATE'
   | 'EXPIRY_SCHEDULE_FAILED'
 
 export class InboxCoreError extends Error {
