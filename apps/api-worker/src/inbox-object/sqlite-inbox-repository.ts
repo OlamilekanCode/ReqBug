@@ -1,3 +1,8 @@
+import {
+  CapturedHeaderSchema,
+  CapturedQueryEntrySchema,
+} from '@reqbug/contracts'
+
 import type {
   CaptureMethod,
   CapturedHeader,
@@ -41,6 +46,89 @@ interface StoredRequestCountRow
     SqlStorageValue
   > {
   stored_request_count: number
+}
+
+interface CaptureListRow
+  extends Record<
+    string,
+    SqlStorageValue
+  > {
+  id: string
+  sequence: number
+  received_at_ms: number
+  method: string
+  path: string
+  content_type: string | null
+  body_size: number
+  body_sha256: ArrayBuffer
+  source_kind: string | null
+  source_confidence: string | null
+  source_evidence_json: string
+  delivery_id: string | null
+  event_id: string | null
+  retry_group_key: string
+  retry_classification: string
+  retry_attempt: number
+  retry_group_size: number
+}
+
+interface CaptureDetailRow
+  extends CaptureListRow {
+  query_json: string
+  headers_json: string
+  body: ArrayBuffer
+}
+
+interface CaptureBodyRow
+  extends Record<
+    string,
+    SqlStorageValue
+  > {
+  content_type: string | null
+  body: ArrayBuffer
+}
+
+export interface StoredCaptureSummary {
+  readonly id: string
+  readonly sequence: number
+  readonly receivedAtMs: number
+  readonly method: CaptureMethod
+  readonly path: string
+  readonly contentType: string | null
+  readonly bodyBytes: number
+  readonly bodySha256: Uint8Array
+  readonly sourceKind: string | null
+  readonly sourceConfidence: string | null
+  readonly sourceEvidence: unknown
+  readonly deliveryId: string | null
+  readonly eventId: string | null
+
+  readonly retry: {
+    readonly groupKey: string
+    readonly classification: string
+    readonly attempt: number
+    readonly groupSize: number
+  }
+}
+
+export interface StoredCaptureDetail
+  extends StoredCaptureSummary {
+  readonly query:
+    readonly CapturedQueryEntry[]
+  readonly headers:
+    readonly CapturedHeader[]
+  readonly body: Uint8Array
+}
+
+export interface StoredCaptureBody {
+  readonly contentType: string | null
+  readonly body: Uint8Array
+}
+
+export interface StoredCaptureSummaryPage {
+  readonly captures:
+    readonly StoredCaptureSummary[]
+  readonly nextBefore: number | null
 }
 
 export interface StoredCaptureInput {
@@ -119,6 +207,64 @@ function toStoredInbox(
   }
 
   return inbox
+}
+
+function toStoredCaptureSummary(
+  row: CaptureListRow,
+): StoredCaptureSummary {
+  return {
+    id: row.id,
+    sequence: row.sequence,
+    receivedAtMs:
+      row.received_at_ms,
+
+    method:
+      row.method as CaptureMethod,
+
+    path: row.path,
+
+    contentType:
+      row.content_type,
+
+    bodyBytes:
+      row.body_size,
+
+    bodySha256:
+      new Uint8Array(
+        row.body_sha256,
+      ).slice(),
+
+    sourceKind:
+      row.source_kind,
+
+    sourceConfidence:
+      row.source_confidence,
+
+    sourceEvidence:
+      JSON.parse(
+        row.source_evidence_json,
+      ),
+
+    deliveryId:
+      row.delivery_id,
+
+    eventId:
+      row.event_id,
+
+    retry: {
+      groupKey:
+        row.retry_group_key,
+
+      classification:
+        row.retry_classification,
+
+      attempt:
+        row.retry_attempt,
+
+      groupSize:
+        row.retry_group_size,
+    },
+  }
 }
 
 export class SqliteInboxRepository
@@ -388,6 +534,270 @@ export class SqliteInboxRepository
             admission.sequence,
         }
       })
+  }
+
+    listCaptureSummaries({
+    before,
+    limit,
+  }: {
+    readonly before: number | null
+    readonly limit: number
+  }): StoredCaptureSummaryPage {
+    this.ensureSchema()
+
+    if (
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > 50
+    ) {
+      throw new Error(
+        'Capture list limit is invalid.',
+      )
+    }
+
+    if (
+      before !== null &&
+      (
+        !Number.isInteger(before) ||
+        before < 1
+      )
+    ) {
+      throw new Error(
+        'Capture list cursor is invalid.',
+      )
+    }
+
+    const requestedRowCount =
+      limit + 1
+
+    const rows =
+      this.sql
+        .exec<CaptureListRow>(
+          `
+            WITH ranked_captures AS (
+              SELECT
+                id,
+                sequence,
+                received_at_ms,
+                method,
+                path,
+                content_type,
+                body_size,
+                body_sha256,
+                source_kind,
+                source_confidence,
+                source_evidence_json,
+                delivery_id,
+                event_id,
+                retry_group_key,
+                retry_classification,
+
+                CASE
+                  WHEN retry_classification =
+                    'unique'
+                  THEN 1
+                  ELSE ROW_NUMBER() OVER (
+                    PARTITION BY
+                      retry_group_key
+                    ORDER BY
+                      sequence ASC
+                  )
+                END AS retry_attempt,
+
+                CASE
+                  WHEN retry_classification =
+                    'unique'
+                  THEN 1
+                  ELSE COUNT(*) OVER (
+                    PARTITION BY
+                      retry_group_key
+                  )
+                END AS retry_group_size
+              FROM captured_requests
+            )
+            SELECT
+              id,
+              sequence,
+              received_at_ms,
+              method,
+              path,
+              content_type,
+              body_size,
+              body_sha256,
+              source_kind,
+              source_confidence,
+              source_evidence_json,
+              delivery_id,
+              event_id,
+              retry_group_key,
+              retry_classification,
+              retry_attempt,
+              retry_group_size
+            FROM ranked_captures
+            WHERE
+              ? IS NULL OR
+              sequence < ?
+            ORDER BY
+              sequence DESC
+            LIMIT ?
+          `,
+          before,
+          before,
+          requestedRowCount,
+        )
+        .toArray()
+
+    const hasNextPage =
+      rows.length > limit
+
+    const pageRows =
+      rows.slice(0, limit)
+      
+    const captures =
+      pageRows.map(
+        toStoredCaptureSummary,
+      )
+
+    const lastCapture =
+      captures.at(-1)
+
+    return {
+      captures,
+
+      nextBefore:
+        hasNextPage &&
+        lastCapture !== undefined
+          ? lastCapture.sequence
+          : null,
+    }
+  }
+
+    findCaptureDetail(
+    requestId: string,
+  ): StoredCaptureDetail | null {
+    this.ensureSchema()
+
+    const row =
+      this.sql
+        .exec<CaptureDetailRow>(
+          `
+            WITH ranked_captures AS (
+              SELECT
+                id,
+                sequence,
+                received_at_ms,
+                method,
+                path,
+                query_json,
+                headers_json,
+                content_type,
+                body,
+                body_size,
+                body_sha256,
+                source_kind,
+                source_confidence,
+                source_evidence_json,
+                delivery_id,
+                event_id,
+                retry_group_key,
+                retry_classification,
+
+                CASE
+                  WHEN retry_classification =
+                    'unique'
+                  THEN 1
+                  ELSE ROW_NUMBER() OVER (
+                    PARTITION BY
+                      retry_group_key
+                    ORDER BY
+                      sequence ASC
+                  )
+                END AS retry_attempt,
+
+                CASE
+                  WHEN retry_classification =
+                    'unique'
+                  THEN 1
+                  ELSE COUNT(*) OVER (
+                    PARTITION BY
+                      retry_group_key
+                  )
+                END AS retry_group_size
+              FROM captured_requests
+            )
+            SELECT
+              *
+            FROM ranked_captures
+            WHERE id = ?
+            LIMIT 1
+          `,
+          requestId,
+        )
+        .toArray()[0]
+
+    if (row === undefined) {
+      return null
+    }
+
+    const query =
+      CapturedQueryEntrySchema
+        .array()
+        .parse(
+          JSON.parse(row.query_json),
+        )
+
+    const headers =
+      CapturedHeaderSchema
+        .array()
+        .parse(
+          JSON.parse(row.headers_json),
+        )
+
+    return {
+      ...toStoredCaptureSummary(row),
+      query,
+      headers,
+
+      body:
+        new Uint8Array(
+          row.body,
+        ).slice(),
+    }
+  }
+
+  findCaptureBody(
+    requestId: string,
+  ): StoredCaptureBody | null {
+    this.ensureSchema()
+
+    const row =
+      this.sql
+        .exec<CaptureBodyRow>(
+          `
+            SELECT
+              content_type,
+              body
+            FROM captured_requests
+            WHERE id = ?
+            LIMIT 1
+          `,
+          requestId,
+        )
+        .toArray()[0]
+
+    if (row === undefined) {
+      return null
+    }
+
+    return {
+      contentType:
+        row.content_type,
+
+      body:
+        new Uint8Array(
+          row.body,
+        ).slice(),
+    }
   }
 
   async clearRequestsById(
