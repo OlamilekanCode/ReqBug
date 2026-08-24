@@ -1,8 +1,6 @@
 import {
   ApiErrorResponseSchema,
-  CaptureAcceptedResponseSchema,
   CaptureDetailSchema,
-  CreateInboxResponseSchema,
 } from '@reqbug/contracts'
 
 import {
@@ -15,82 +13,11 @@ import {
   it,
 } from 'vitest'
 
-async function createTestInbox() {
-  const response =
-    await exports.default.fetch(
-      new Request(
-        'https://reqbug.test/api/v1/inboxes',
-        {
-          method: 'POST',
-        },
-      ),
-    )
-
-  return CreateInboxResponseSchema
-    .parse(
-      await response.json(),
-    )
-    .data
-}
-
-async function captureRequest({
-  ingestUrl,
-  path,
-  body,
-  contentType,
-}: {
-  readonly ingestUrl: string
-  readonly path: string
-  readonly body:
-    string | Uint8Array
-  readonly contentType: string
-}) {
-  const response =
-    await exports.default.fetch(
-      new Request(
-        `${ingestUrl}${path}`,
-        {
-          method: 'POST',
-
-          headers: {
-            'content-type':
-              contentType,
-
-            'x-example':
-              'example-value',
-          },
-
-          body,
-        },
-      ),
-    )
-
-  expect(response.status).toBe(200)
-
-  return CaptureAcceptedResponseSchema
-    .parse(
-      await response.json(),
-    )
-    .requestId
-}
-
-function authorizedRequest(
-  url: string,
-  readToken?: string,
-): Request {
-  return new Request(
-    url,
-    {
-      headers:
-        readToken === undefined
-          ? undefined
-          : {
-              Authorization:
-                `Bearer ${readToken}`,
-            },
-    },
-  )
-}
+import {
+  authorizedRequest,
+  captureWebhook,
+  createTestInbox,
+} from './support/api-worker-fixtures.js'
 
 describe('authenticated capture detail routes', () => {
   it('returns JSON detail with repeated query entries and normalized headers', async () => {
@@ -101,7 +28,7 @@ describe('authenticated capture detail routes', () => {
       '{"event":"payment.completed"}'
 
     const requestId =
-      await captureRequest({
+      await captureWebhook({
         ingestUrl:
           inbox.ingestUrl,
 
@@ -112,6 +39,11 @@ describe('authenticated capture detail routes', () => {
 
         contentType:
           'application/json; charset=utf-8',
+
+        headers: {
+          'x-example':
+            'example-value',
+        },
       })
 
     const response =
@@ -171,7 +103,7 @@ describe('authenticated capture detail routes', () => {
       await createTestInbox()
 
     const requestId =
-      await captureRequest({
+      await captureWebhook({
         ingestUrl:
           inbox.ingestUrl,
 
@@ -182,6 +114,11 @@ describe('authenticated capture detail routes', () => {
 
         contentType:
           'text/plain',
+
+        headers: {
+          'x-example':
+            'example-value',
+        },
       })
 
     const response =
@@ -211,7 +148,7 @@ describe('authenticated capture detail routes', () => {
       await createTestInbox()
 
     const requestId =
-      await captureRequest({
+      await captureWebhook({
         ingestUrl:
           inbox.ingestUrl,
 
@@ -226,6 +163,11 @@ describe('authenticated capture detail routes', () => {
 
         contentType:
           'application/octet-stream',
+
+        headers: {
+          'x-example':
+            'example-value',
+        },
       })
 
     const response =
@@ -267,7 +209,7 @@ describe('authenticated capture detail routes', () => {
       ])
 
     const requestId =
-      await captureRequest({
+      await captureWebhook({
         ingestUrl:
           inbox.ingestUrl,
 
@@ -278,6 +220,11 @@ describe('authenticated capture detail routes', () => {
 
         contentType:
           'application/octet-stream',
+
+        headers: {
+          'x-example':
+            'example-value',
+        },
       })
 
     const response =
