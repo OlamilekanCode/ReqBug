@@ -4,6 +4,8 @@ import {
   CreateInboxResponseSchema,
   DEFAULT_CAPTURE_LIST_PAGE_SIZE,
   InboxMetadataResponseSchema,
+  CaptureDetailSchema,
+  CaptureIdSchema,
   MAX_CAPTURE_BODY_BYTES,
   MAX_CAPTURE_LIST_PAGE_SIZE,
   MAX_INBOX_CAPTURE_COUNT,
@@ -23,6 +25,7 @@ import {
   ReqBugInbox,
   type CaptureWebhookFailureReason,
   type ReadInboxMetadataFailureReason,
+  type CaptureReadFailureReason,
 } from './inbox-object/reqbug-inbox.js'
 
 import {
@@ -246,6 +249,26 @@ function inboxReadFailureResponse(
         'This webhook inbox is no longer available.',
       )
   }
+}
+
+function captureReadFailureResponse(
+  method: string,
+  reason:
+    CaptureReadFailureReason,
+): Response {
+  if (reason === 'request-not-found') {
+    return captureError(
+      method,
+      404,
+      'NOT_FOUND',
+      'The requested webhook capture was not found.',
+    )
+  }
+
+  return inboxReadFailureResponse(
+    method,
+    reason,
+  )
 }
 
 function getCapturedPath({
@@ -712,6 +735,169 @@ app.get(
               result.nextBefore,
           },
         })
+
+      return jsonResponse(
+        request.method,
+        response,
+        200,
+      )
+    } catch {
+      return captureError(
+        request.method,
+        503,
+        'INBOX_UNAVAILABLE',
+        'The webhook inbox is temporarily unavailable.',
+      )
+    }
+  },
+)
+
+app.get(
+  '/api/v1/inboxes/:inboxId/requests/:requestId/body',
+  async (context) => {
+    const request =
+      context.req.raw
+
+    const inboxId =
+      context.req.param('inboxId')
+
+    const requestId =
+      context.req.param('requestId')
+
+    const readToken =
+      getBearerCapability(request)
+
+    if (
+      inboxId === undefined ||
+      requestId === undefined ||
+      readToken === null ||
+      !CaptureIdSchema.safeParse(
+        requestId,
+      ).success
+    ) {
+      return captureError(
+        request.method,
+        404,
+        'NOT_FOUND',
+        'The requested webhook capture was not found.',
+      )
+    }
+
+    const inbox =
+      context.env.INBOXES.getByName(
+        inboxId,
+      )
+
+    try {
+      const result =
+        await inbox.readCaptureBody({
+          inboxId,
+          readToken,
+          requestId,
+        })
+
+      if (!result.found) {
+        return captureReadFailureResponse(
+          request.method,
+          result.reason,
+        )
+      }
+
+      return new Response(
+        result.body,
+        {
+          status: 200,
+
+          headers: {
+            'Content-Type':
+              result.contentType ??
+              'application/octet-stream',
+
+            'Content-Length':
+              String(
+                result.body.byteLength,
+              ),
+
+            'Content-Disposition':
+              'attachment; filename="reqbug-body.bin"',
+
+            'Cache-Control':
+              'no-store',
+
+            'Referrer-Policy':
+              'no-referrer',
+
+            'X-Content-Type-Options':
+              'nosniff',
+          },
+        },
+      )
+    } catch {
+      return captureError(
+        request.method,
+        503,
+        'INBOX_UNAVAILABLE',
+        'The webhook inbox is temporarily unavailable.',
+      )
+    }
+  },
+)
+
+app.get(
+  '/api/v1/inboxes/:inboxId/requests/:requestId',
+  async (context) => {
+    const request =
+      context.req.raw
+
+    const inboxId =
+      context.req.param('inboxId')
+
+    const requestId =
+      context.req.param('requestId')
+
+    const readToken =
+      getBearerCapability(request)
+
+    if (
+      inboxId === undefined ||
+      requestId === undefined ||
+      readToken === null ||
+      !CaptureIdSchema.safeParse(
+        requestId,
+      ).success
+    ) {
+      return captureError(
+        request.method,
+        404,
+        'NOT_FOUND',
+        'The requested webhook capture was not found.',
+      )
+    }
+
+    const inbox =
+      context.env.INBOXES.getByName(
+        inboxId,
+      )
+
+    try {
+      const result =
+        await inbox.readCaptureDetail({
+          inboxId,
+          readToken,
+          requestId,
+        })
+
+      if (!result.found) {
+        return captureReadFailureResponse(
+          request.method,
+          result.reason,
+        )
+      }
+
+      const response =
+        CaptureDetailSchema.parse(
+          result.detail,
+        )
 
       return jsonResponse(
         request.method,

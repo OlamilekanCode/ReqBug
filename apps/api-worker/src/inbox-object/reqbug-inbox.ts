@@ -1,5 +1,9 @@
 import {
+  CaptureBodyViewSchema,
+  CaptureDetailSchema,
   CaptureSummarySchema,
+  type CaptureBodyView,
+  type CaptureDetail,
   type CaptureSummary,
 } from '@reqbug/contracts'
 
@@ -38,6 +42,7 @@ import {
 import {
   SqliteInboxRepository,
   type CapturePersistenceFailureReason,
+  type StoredCaptureSummary,
 } from './sqlite-inbox-repository.js'
 
 export interface CaptureWebhookInput {
@@ -73,6 +78,39 @@ export type ReadInboxMetadataResult =
       readonly found: false
       readonly reason:
         ReadInboxMetadataFailureReason
+    }
+
+export type CaptureReadFailureReason =
+  | InboxAuthorizationFailureReason
+  | 'request-not-found'
+
+export interface ReadCaptureDetailInput {
+  readonly inboxId: string
+  readonly readToken: string
+  readonly requestId: string
+}
+
+export type ReadCaptureDetailResult =
+  | {
+      readonly found: true
+      readonly detail: CaptureDetail
+    }
+  | {
+      readonly found: false
+      readonly reason:
+        CaptureReadFailureReason
+    }
+
+export type ReadCaptureBodyResult =
+  | {
+      readonly found: true
+      readonly contentType: string | null
+      readonly body: Uint8Array
+    }
+  | {
+      readonly found: false
+      readonly reason:
+        CaptureReadFailureReason
     }
 
 export interface ListInboxCapturesInput {
@@ -137,6 +175,122 @@ async function createRetryGroupKey(
     'fingerprint:' +
     bytesToBase64Url(fingerprint)
   )
+}
+
+const fatalUtf8Decoder =
+  new TextDecoder(
+    'utf-8',
+    {
+      fatal: true,
+      ignoreBOM: false,
+    },
+  )
+
+function toCaptureSummary(
+  capture: StoredCaptureSummary,
+): CaptureSummary {
+  return CaptureSummarySchema.parse({
+    id: capture.id,
+    sequence:
+      capture.sequence,
+
+    receivedAt:
+      new Date(
+        capture.receivedAtMs,
+      ).toISOString(),
+
+    method:
+      capture.method,
+
+    path:
+      capture.path,
+
+    contentType:
+      capture.contentType,
+
+    bodyBytes:
+      capture.bodyBytes,
+
+    bodySha256:
+      bytesToBase64Url(
+        capture.bodySha256,
+      ),
+
+    source:
+      capture.sourceKind === null
+        ? {
+            kind: 'unknown',
+            confidence: null,
+            evidence: [],
+          }
+        : {
+            kind:
+              capture.sourceKind,
+
+            confidence:
+              capture.sourceConfidence,
+
+            evidence:
+              capture.sourceEvidence,
+          },
+
+    deliveryId:
+      capture.deliveryId,
+
+    eventId:
+      capture.eventId,
+
+    retry: {
+      groupKey:
+        capture.retry.groupKey,
+
+      classification:
+        capture.retry.classification,
+
+      attempt:
+        capture.retry.attempt,
+
+      groupSize:
+        capture.retry.groupSize,
+    },
+  })
+}
+
+function createCaptureBodyView(
+  body: Uint8Array,
+  downloadUrl: string,
+): CaptureBodyView {
+  let text: string
+
+  try {
+    text =
+      fatalUtf8Decoder.decode(body)
+  } catch {
+    return CaptureBodyViewSchema.parse({
+      encoding: 'binary',
+      downloadUrl,
+    })
+  }
+
+  try {
+    const json: unknown =
+      JSON.parse(text)
+
+    return CaptureBodyViewSchema.parse({
+      encoding: 'utf-8',
+      text,
+      json,
+      jsonDerived: true,
+      downloadUrl,
+    })
+  } catch {
+    return CaptureBodyViewSchema.parse({
+      encoding: 'utf-8',
+      text,
+      jsonDerived: false,
+      downloadUrl,
+    })
+  }
 }
 
 export class ReqBugInbox
@@ -302,75 +456,7 @@ export class ReqBugInbox
 
     const captures =
       page.captures.map(
-        (capture) =>
-          CaptureSummarySchema.parse({
-            id: capture.id,
-            sequence:
-              capture.sequence,
-
-            receivedAt:
-              new Date(
-                capture.receivedAtMs,
-              ).toISOString(),
-
-            method:
-              capture.method,
-
-            path:
-              capture.path,
-
-            contentType:
-              capture.contentType,
-
-            bodyBytes:
-              capture.bodyBytes,
-
-            bodySha256:
-              bytesToBase64Url(
-                capture.bodySha256,
-              ),
-
-            source:
-              capture.sourceKind === null
-                ? {
-                    kind: 'unknown',
-                    confidence: null,
-                    evidence: [],
-                  }
-                : {
-                    kind:
-                      capture.sourceKind,
-
-                    confidence:
-                      capture
-                        .sourceConfidence,
-
-                    evidence:
-                      capture
-                        .sourceEvidence,
-                  },
-
-            deliveryId:
-              capture.deliveryId,
-
-            eventId:
-              capture.eventId,
-
-            retry: {
-              groupKey:
-                capture.retry.groupKey,
-
-              classification:
-                capture.retry
-                  .classification,
-
-              attempt:
-                capture.retry.attempt,
-
-              groupSize:
-                capture.retry.groupSize,
-            },
-          }),
+        toCaptureSummary,
       )
 
     return {
@@ -378,6 +464,131 @@ export class ReqBugInbox
       captures,
       nextBefore:
         page.nextBefore,
+    }
+  }
+
+  async readCaptureDetail({
+    inboxId,
+    readToken,
+    requestId,
+  }: ReadCaptureDetailInput): Promise<ReadCaptureDetailResult> {
+    const authorization =
+      await authorizeInbox(
+        {
+          clock: this.clock,
+          tokenDigests:
+            this.tokenDigests,
+          inboxes:
+            this.repository,
+        },
+        {
+          inboxId,
+          capabilityToken:
+            readToken,
+          capability: 'read',
+        },
+      )
+
+    if (!authorization.authorized) {
+      return {
+        found: false,
+        reason:
+          authorization.reason,
+      }
+    }
+
+    const capture =
+      this.repository
+        .findCaptureDetail(requestId)
+
+    if (capture === null) {
+      return {
+        found: false,
+        reason:
+          'request-not-found',
+      }
+    }
+
+    const downloadUrl =
+      `/api/v1/inboxes/` +
+      `${encodeURIComponent(inboxId)}/` +
+      `requests/` +
+      `${encodeURIComponent(requestId)}/` +
+      `body`
+
+    const detail =
+      CaptureDetailSchema.parse({
+        ...toCaptureSummary(capture),
+
+        query:
+          capture.query,
+
+        headers:
+          capture.headers,
+
+        body:
+          createCaptureBodyView(
+            capture.body,
+            downloadUrl,
+          ),
+      })
+
+    return {
+      found: true,
+      detail,
+    }
+  }
+
+  async readCaptureBody({
+    inboxId,
+    readToken,
+    requestId,
+  }: ReadCaptureDetailInput): Promise<ReadCaptureBodyResult> {
+    const authorization =
+      await authorizeInbox(
+        {
+          clock: this.clock,
+          tokenDigests:
+            this.tokenDigests,
+          inboxes:
+            this.repository,
+        },
+        {
+          inboxId,
+          capabilityToken:
+            readToken,
+          capability: 'read',
+        },
+      )
+
+    if (!authorization.authorized) {
+      return {
+        found: false,
+        reason:
+          authorization.reason,
+      }
+    }
+
+    const capture =
+      this.repository
+        .findCaptureBody(requestId)
+
+    if (capture === null) {
+      return {
+        found: false,
+        reason:
+          'request-not-found',
+      }
+    }
+
+    return {
+      found: true,
+
+      contentType:
+        capture.contentType,
+
+      body:
+        capture.body,
     }
   }
 
