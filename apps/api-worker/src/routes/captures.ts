@@ -25,6 +25,7 @@ import {
   captureReadFailureResponse,
   inboxReadFailureResponse,
   jsonResponse,
+  noContentResponse,
 } from '../http/responses.js'
 
 export function registerCaptureRoutes(
@@ -107,6 +108,61 @@ export function registerCaptureRoutes(
           response,
           200,
         )
+      } catch {
+        return captureError(
+          request.method,
+          503,
+          'INBOX_UNAVAILABLE',
+          'The webhook inbox is temporarily unavailable.',
+        )
+      }
+    },
+  )
+
+  app.delete(
+    '/api/v1/inboxes/:inboxId/requests',
+    async (context) => {
+      const request =
+        context.req.raw
+
+      const inboxId =
+        context.req.param('inboxId')
+
+      const readToken =
+        getBearerCapability(request)
+
+      if (
+        inboxId === undefined ||
+        readToken === null
+      ) {
+        return captureError(
+          request.method,
+          404,
+          'NOT_FOUND',
+          'The requested webhook inbox was not found.',
+        )
+      }
+
+      const inbox =
+        context.env.INBOXES.getByName(
+          inboxId,
+        )
+
+      try {
+        const result =
+          await inbox.clearInboxRequests({
+            inboxId,
+            readToken,
+          })
+
+        if (!result.cleared) {
+          return inboxReadFailureResponse(
+            request.method,
+            result.reason,
+          )
+        }
+
+        return noContentResponse()
       } catch {
         return captureError(
           request.method,

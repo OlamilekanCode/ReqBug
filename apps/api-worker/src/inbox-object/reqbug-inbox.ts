@@ -5,7 +5,9 @@ import {
 import {
   DEFAULT_INBOX_POLICY,
   authorizeInbox,
+  clearInboxRequests as clearInboxRequestsUseCase,
   createInbox,
+  deleteInbox as deleteInboxUseCase,
   expireInbox,
   type CreatedInboxCapabilities,
 } from '@reqbug/core'
@@ -42,10 +44,16 @@ import {
 } from './sqlite-inbox-repository.js'
 
 export type {
+  ClearInboxRequestsFailureReason,
+  ClearInboxRequestsInput,
+  ClearInboxRequestsResult,
   CaptureReadFailureReason,
   CaptureWebhookFailureReason,
   CaptureWebhookInput,
   CaptureWebhookResult,
+  DeleteInboxFailureReason,
+  DeleteInboxInput,
+  DeleteInboxResult,
   ListInboxCapturesInput,
   ListInboxCapturesResult,
   ReadCaptureBodyResult,
@@ -57,8 +65,12 @@ export type {
 } from './rpc-types.js'
 
 import type {
+  ClearInboxRequestsInput,
+  ClearInboxRequestsResult,
   CaptureWebhookInput,
   CaptureWebhookResult,
+  DeleteInboxInput,
+  DeleteInboxResult,
   ListInboxCapturesInput,
   ListInboxCapturesResult,
   ReadCaptureBodyResult,
@@ -184,6 +196,68 @@ export class ReqBugInbox
         lifetimeRequestCount:
           inbox.lifetimeRequestCount,
       },
+    }
+  }
+
+  async clearInboxRequests(
+    input: ClearInboxRequestsInput,
+  ): Promise<ClearInboxRequestsResult> {
+    const result =
+      await clearInboxRequestsUseCase(
+        {
+          clock: this.clock,
+          tokenDigests:
+            this.tokenDigests,
+          inboxes:
+            this.repository,
+          expiry:
+            this.expiry,
+          notifier:
+            this.notifier,
+        },
+        input,
+      )
+
+    if (!result.cleared) {
+      return result
+    }
+
+    return {
+      cleared: true,
+      clearedAtMs:
+        result.clearedAtMs,
+      clearedRequestCount:
+        result.clearedRequestCount,
+    }
+  }
+
+  async deleteInbox(
+    input: DeleteInboxInput,
+  ): Promise<DeleteInboxResult> {
+    const result =
+      await deleteInboxUseCase(
+        {
+          clock: this.clock,
+          tokenDigests:
+            this.tokenDigests,
+          inboxes:
+            this.repository,
+          expiry:
+            this.expiry,
+          notifier:
+            this.notifier,
+        },
+        input,
+      )
+
+    if (!result.deleted) {
+      return result
+    }
+
+    return {
+      deleted: true,
+      deletedAtMs:
+        result.deletedAtMs,
     }
   }
   
