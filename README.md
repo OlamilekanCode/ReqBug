@@ -10,7 +10,7 @@ ReqBug gives developers a temporary HTTPS inbox for inspecting webhook requests,
 
 ReqBug is under active development and is not yet deployed for public use.
 
-The backend foundation now includes secure inbox creation, authenticated exact-byte webhook ingestion, authenticated request-reading APIs, and GitHub Actions CI. Live request updates are the next product milestone.
+The backend foundation now includes secure inbox creation, authenticated exact-byte webhook ingestion, authenticated request-reading and lifecycle APIs, and GitHub Actions CI. Live request updates are the next product milestone.
 
 ### Current progress
 
@@ -23,14 +23,14 @@ The backend foundation now includes secure inbox creation, authenticated exact-b
 | Durable Object SQLite persistence | Complete |
 | Secure inbox creation API | Complete |
 | Webhook request ingestion | Complete |
-| Authenticated request API | Complete |
+| Authenticated request and lifecycle API | Complete |
 | Live request updates | Planned |
 | React inspection dashboard | Planned |
 | Replay-pack generation | Planned |
 | GitHub Actions CI | Complete |
 | Deployment | Planned |
 
-The repository currently contains **197 passing Vitest tests** across the contracts, core, signatures, and API Worker packages.
+The repository currently contains **219 passing Vitest tests** across the contracts, core, signatures, and API Worker packages.
 
 ## Why ReqBug?
 
@@ -95,6 +95,7 @@ The provider catalog also records algorithms, encodings, expected headers, fresh
 - Expiration alarm scheduling
 - Security response headers
 - Authenticated public webhook-ingestion routes
+- Authenticated inbox clear and delete routes
 - Bounded streaming request-body capture
 - Exact body-byte and SHA-256 preservation
 - Atomic capture insertion and quota advancement
@@ -189,6 +190,17 @@ GET /api/v1/inboxes/:inboxId/requests/:requestId/body
 ```
 
 These routes require the read capability in the `Authorization: Bearer <readToken>` header. The body download returns the exact captured bytes with `Cache-Control: no-store`.
+
+### Clear or delete an inbox
+
+```http
+DELETE /api/v1/inboxes/:inboxId/requests
+DELETE /api/v1/inboxes/:inboxId
+```
+
+These routes require the read capability in the `Authorization: Bearer <readToken>` header.
+
+Clearing an inbox removes stored captures but does not reset the 50-request lifetime capture quota. Deleting an inbox invalidates future reads and webhook ingestion.
 
 ## Planned MVP workflow
 

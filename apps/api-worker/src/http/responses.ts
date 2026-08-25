@@ -51,6 +51,23 @@ export function jsonResponse(
   )
 }
 
+export function noContentResponse(): Response {
+  return new Response(
+    null,
+    {
+      status: 204,
+
+      headers: {
+        'Cache-Control':
+          'no-store',
+
+        'Referrer-Policy':
+          'no-referrer',
+      },
+    },
+  )
+}
+
 export function captureError(
   method: string,
   status: number,

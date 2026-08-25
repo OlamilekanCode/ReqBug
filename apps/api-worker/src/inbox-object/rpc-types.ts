@@ -27,6 +27,16 @@ export interface ReadInboxMetadataInput {
   readonly readToken: string
 }
 
+export interface ClearInboxRequestsInput {
+  readonly inboxId: string
+  readonly readToken: string
+}
+
+export interface DeleteInboxInput {
+  readonly inboxId: string
+  readonly readToken: string
+}
+
 export interface InboxMetadataSnapshot {
   readonly inboxId: string
   readonly createdAtMs: number
@@ -48,6 +58,35 @@ export type ReadInboxMetadataResult =
       readonly found: false
       readonly reason:
         ReadInboxMetadataFailureReason
+    }
+
+export type ClearInboxRequestsFailureReason =
+  InboxAuthorizationFailureReason
+
+export type ClearInboxRequestsResult =
+  | {
+      readonly cleared: true
+      readonly clearedAtMs: number
+      readonly clearedRequestCount: number
+    }
+  | {
+      readonly cleared: false
+      readonly reason:
+        ClearInboxRequestsFailureReason
+    }
+
+export type DeleteInboxFailureReason =
+  InboxAuthorizationFailureReason
+
+export type DeleteInboxResult =
+  | {
+      readonly deleted: true
+      readonly deletedAtMs: number
+    }
+  | {
+      readonly deleted: false
+      readonly reason:
+        DeleteInboxFailureReason
     }
 
 export type CaptureReadFailureReason =
