@@ -10,7 +10,7 @@ ReqBug gives developers a temporary HTTPS inbox for inspecting webhook requests,
 
 ReqBug is under active development and is not yet deployed for public use.
 
-The backend foundation now includes secure inbox creation and authenticated, exact-byte webhook ingestion backed by Durable Object SQLite. Authenticated request-reading APIs are the next milestone.
+The backend foundation now includes secure inbox creation, authenticated exact-byte webhook ingestion, authenticated request-reading APIs, and GitHub Actions CI. Live request updates are the next product milestone.
 
 ### Current progress
 
@@ -23,11 +23,12 @@ The backend foundation now includes secure inbox creation and authenticated, exa
 | Durable Object SQLite persistence | Complete |
 | Secure inbox creation API | Complete |
 | Webhook request ingestion | Complete |
-| Authenticated request API | Next |
+| Authenticated request API | Complete |
 | Live request updates | Planned |
 | React inspection dashboard | Planned |
 | Replay-pack generation | Planned |
-| Deployment and CI | Planned |
+| GitHub Actions CI | Complete |
+| Deployment | Planned |
 
 The repository currently contains **197 passing Vitest tests** across the contracts, core, signatures, and API Worker packages.
 
@@ -177,6 +178,17 @@ The response contains:
 - The inbox capture and body-size limits
 
 The raw capabilities are returned only during creation. The backend stores their SHA-256 digests.
+
+### Read inbox metadata and captures
+
+```http
+GET /api/v1/inboxes/:inboxId
+GET /api/v1/inboxes/:inboxId/requests
+GET /api/v1/inboxes/:inboxId/requests/:requestId
+GET /api/v1/inboxes/:inboxId/requests/:requestId/body
+```
+
+These routes require the read capability in the `Authorization: Bearer <readToken>` header. The body download returns the exact captured bytes with `Cache-Control: no-store`.
 
 ## Planned MVP workflow
 

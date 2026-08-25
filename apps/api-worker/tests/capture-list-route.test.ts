@@ -1,7 +1,6 @@
 import {
   ApiErrorResponseSchema,
   CaptureListResponseSchema,
-  CreateInboxResponseSchema,
 } from '@reqbug/contracts'
 
 import {
@@ -14,48 +13,10 @@ import {
   it,
 } from 'vitest'
 
-async function createTestInbox() {
-  const response =
-    await exports.default.fetch(
-      new Request(
-        'https://reqbug.test/api/v1/inboxes',
-        {
-          method: 'POST',
-        },
-      ),
-    )
-
-  return CreateInboxResponseSchema
-    .parse(
-      await response.json(),
-    )
-    .data
-}
-
-async function capture(
-  ingestUrl: string,
-  path: string,
-  body: string,
-): Promise<void> {
-  const response =
-    await exports.default.fetch(
-      new Request(
-        `${ingestUrl}${path}`,
-        {
-          method: 'POST',
-
-          headers: {
-            'content-type':
-              'application/json; charset=utf-8',
-          },
-
-          body,
-        },
-      ),
-    )
-
-  expect(response.status).toBe(200)
-}
+import {
+  captureWebhook,
+  createTestInbox,
+} from './support/api-worker-fixtures.js'
 
 function listRequest(
   inboxId: string,
@@ -109,23 +70,32 @@ describe('GET /api/v1/inboxes/:inboxId/requests', () => {
     const inbox =
       await createTestInbox()
 
-    await capture(
-      inbox.ingestUrl,
-      '/first',
-      '{"position":1}',
-    )
+    await captureWebhook({
+      ingestUrl:
+        inbox.ingestUrl,
+      path: '/first',
+      body: '{"position":1}',
+      contentType:
+        'application/json; charset=utf-8',
+    })
 
-    await capture(
-      inbox.ingestUrl,
-      '/second',
-      '{"position":2}',
-    )
+    await captureWebhook({
+      ingestUrl:
+        inbox.ingestUrl,
+      path: '/second',
+      body: '{"position":2}',
+      contentType:
+        'application/json; charset=utf-8',
+    })
 
-    await capture(
-      inbox.ingestUrl,
-      '/third',
-      '{"position":3}',
-    )
+    await captureWebhook({
+      ingestUrl:
+        inbox.ingestUrl,
+      path: '/third',
+      body: '{"position":3}',
+      contentType:
+        'application/json; charset=utf-8',
+    })
 
     const response =
       await exports.default.fetch(
@@ -187,23 +157,32 @@ describe('GET /api/v1/inboxes/:inboxId/requests', () => {
     const inbox =
       await createTestInbox()
 
-    await capture(
-      inbox.ingestUrl,
-      '/one',
-      '{"page":1}',
-    )
+    await captureWebhook({
+      ingestUrl:
+        inbox.ingestUrl,
+      path: '/one',
+      body: '{"page":1}',
+      contentType:
+        'application/json; charset=utf-8',
+    })
 
-    await capture(
-      inbox.ingestUrl,
-      '/two',
-      '{"page":2}',
-    )
+    await captureWebhook({
+      ingestUrl:
+        inbox.ingestUrl,
+      path: '/two',
+      body: '{"page":2}',
+      contentType:
+        'application/json; charset=utf-8',
+    })
 
-    await capture(
-      inbox.ingestUrl,
-      '/three',
-      '{"page":3}',
-    )
+    await captureWebhook({
+      ingestUrl:
+        inbox.ingestUrl,
+      path: '/three',
+      body: '{"page":3}',
+      contentType:
+        'application/json; charset=utf-8',
+    })
 
     const firstResponse =
       await exports.default.fetch(

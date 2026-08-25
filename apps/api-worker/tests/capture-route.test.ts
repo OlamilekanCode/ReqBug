@@ -1,5 +1,4 @@
 import {
-  CreateInboxResponseSchema,
   MAX_CAPTURE_BODY_BYTES,
 } from '@reqbug/contracts'
 
@@ -22,6 +21,10 @@ import type {
   ReqBugInbox,
 } from '../src/inbox-object/reqbug-inbox.js'
 
+import {
+  createTestInbox,
+} from './support/api-worker-fixtures.js'
+
 interface CapturedRouteRow
   extends Record<
     string,
@@ -41,24 +44,6 @@ interface CountRow
     SqlStorageValue
   > {
   count: number
-}
-
-async function createTestInbox() {
-  const response =
-    await exports.default.fetch(
-      new Request(
-        'https://reqbug.test/api/v1/inboxes',
-        {
-          method: 'POST',
-        },
-      ),
-    )
-
-  return CreateInboxResponseSchema
-    .parse(
-      await response.json(),
-    )
-    .data
 }
 
 function getRequestCount(

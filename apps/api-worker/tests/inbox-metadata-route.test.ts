@@ -1,6 +1,5 @@
 import {
   ApiErrorResponseSchema,
-  CreateInboxResponseSchema,
   InboxMetadataResponseSchema,
 } from '@reqbug/contracts'
 
@@ -23,25 +22,10 @@ import type {
   ReqBugInbox,
 } from '../src/inbox-object/reqbug-inbox.js'
 
-async function createTestInbox() {
-  const response =
-    await exports.default.fetch(
-      new Request(
-        'https://reqbug.test/api/v1/inboxes',
-        {
-          method: 'POST',
-        },
-      ),
-    )
-
-  expect(response.status).toBe(201)
-
-  return CreateInboxResponseSchema
-    .parse(
-      await response.json(),
-    )
-    .data
-}
+import {
+  authorizedRequest,
+  createTestInbox,
+} from './support/api-worker-fixtures.js'
 
 function metadataUrl(
   inboxId: string,
@@ -56,17 +40,9 @@ function metadataRequest(
   inboxId: string,
   readToken?: string,
 ): Request {
-  return new Request(
+  return authorizedRequest(
     metadataUrl(inboxId),
-    {
-      headers:
-        readToken === undefined
-          ? undefined
-          : {
-              Authorization:
-                `Bearer ${readToken}`,
-            },
-    },
+    readToken,
   )
 }
 
