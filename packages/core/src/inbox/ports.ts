@@ -45,6 +45,27 @@ export interface ClearStoredRequestsResult {
   readonly clearedRequestCount: number
 }
 
+export type LiveTicketIssueResult =
+  | {
+      readonly issued: true
+    }
+  | {
+      readonly issued: false
+      readonly reason:
+        'live-ticket-limit-reached'
+    }
+
+export type LiveTicketConsumeResult =
+  | {
+      readonly consumed: true
+    }
+  | {
+      readonly consumed: false
+      readonly reason:
+        | 'not-found'
+        | 'expired'
+    }
+
 export interface InboxLifecycleRepository
   extends InboxRepository {
   clearRequestsById(
@@ -55,6 +76,20 @@ export interface InboxLifecycleRepository
     readonly inboxId: string
     readonly deletedAtMs: number
   }): Promise<void>
+}
+
+export interface LiveTicketRepository {
+  issueLiveTicket(input: {
+    readonly ticketHash: Uint8Array
+    readonly expiresAtMs: number
+    readonly nowMs: number
+    readonly unexpiredLimit: number
+  }): Promise<LiveTicketIssueResult>
+
+  consumeLiveTicket(input: {
+    readonly ticketHash: Uint8Array
+    readonly nowMs: number
+  }): Promise<LiveTicketConsumeResult>
 }
 
 export type InboxTerminationReason =

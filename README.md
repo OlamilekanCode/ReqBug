@@ -10,7 +10,7 @@ ReqBug gives developers a temporary HTTPS inbox for inspecting webhook requests,
 
 ReqBug is under active development and is not yet deployed for public use.
 
-The backend foundation now includes secure inbox creation, authenticated exact-byte webhook ingestion, authenticated request-reading and lifecycle APIs, and GitHub Actions CI. Live request updates are the next product milestone.
+The backend foundation now includes secure inbox creation, authenticated exact-byte webhook ingestion, authenticated request-reading and lifecycle APIs, secure live-ticket issuance, and GitHub Actions CI. Live WebSocket connections are the next product milestone.
 
 ### Current progress
 
@@ -24,13 +24,14 @@ The backend foundation now includes secure inbox creation, authenticated exact-b
 | Secure inbox creation API | Complete |
 | Webhook request ingestion | Complete |
 | Authenticated request and lifecycle API | Complete |
+| Secure live-ticket issuance | Complete |
 | Live request updates | Planned |
 | React inspection dashboard | Planned |
 | Replay-pack generation | Planned |
 | GitHub Actions CI | Complete |
 | Deployment | Planned |
 
-The repository currently contains **219 passing Vitest tests** across the contracts, core, signatures, and API Worker packages.
+The repository currently contains **232 passing Vitest tests** across the contracts, core, signatures, and API Worker packages.
 
 ## Why ReqBug?
 
@@ -96,6 +97,7 @@ The provider catalog also records algorithms, encodings, expected headers, fresh
 - Security response headers
 - Authenticated public webhook-ingestion routes
 - Authenticated inbox clear and delete routes
+- Authenticated live-ticket issuance route
 - Bounded streaming request-body capture
 - Exact body-byte and SHA-256 preservation
 - Atomic capture insertion and quota advancement
@@ -201,6 +203,16 @@ DELETE /api/v1/inboxes/:inboxId
 These routes require the read capability in the `Authorization: Bearer <readToken>` header.
 
 Clearing an inbox removes stored captures but does not reset the 50-request lifetime capture quota. Deleting an inbox invalidates future reads and webhook ingestion.
+
+### Issue a live connection ticket
+
+```http
+POST /api/v1/inboxes/:inboxId/live-tickets
+```
+
+This route requires the read capability in the `Authorization: Bearer <readToken>` header.
+
+Live tickets expire within 30 seconds, are limited to three unexpired tickets per inbox, and are designed for one successful live connection. The backend stores only SHA-256 ticket digests and expiry timestamps. The WebSocket upgrade route and live events are not implemented yet.
 
 ## Planned MVP workflow
 

@@ -63,9 +63,24 @@ export {
   type InboxLifecycleDependencies,
 } from './inbox/lifecycle.js'
 
+export {
+  consumeLiveTicket,
+  issueLiveTicket,
+  type ConsumeLiveTicketFailureReason,
+  type ConsumeLiveTicketInput,
+  type ConsumeLiveTicketResult,
+  type IssueLiveTicketFailureReason,
+  type IssueLiveTicketInput,
+  type IssueLiveTicketResult,
+  type LiveTicketDependencies,
+} from './inbox/live-tickets.js'
+
 export type {
   ClearStoredRequestsResult,
   InboxLifecycleNotifier,
   InboxLifecycleRepository,
   InboxTerminationReason,
+  LiveTicketConsumeResult,
+  LiveTicketIssueResult,
+  LiveTicketRepository,
 } from './inbox/ports.js'

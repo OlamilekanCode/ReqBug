@@ -9,8 +9,13 @@ import {
   InboxCoreError,
   assessCaptureAdmission,
   isValidStoredInboxState,
+  isValidTimestamp,
+  isValidTokenDigest,
   type CaptureAdmissionFailureReason,
   type InboxLifecycleRepository,
+  type LiveTicketConsumeResult,
+  type LiveTicketIssueResult,
+  type LiveTicketRepository,
   type StoredInbox,
 } from '@reqbug/core'
 
@@ -77,8 +82,26 @@ export type CapturePersistenceResult =
         CapturePersistenceFailureReason
     }
 
+interface LiveTicketCountRow
+  extends Record<
+    string,
+    SqlStorageValue
+  > {
+  count: number
+}
+
+interface LiveTicketExpiryRow
+  extends Record<
+    string,
+    SqlStorageValue
+  > {
+  expires_at_ms: number
+}
+
 export class SqliteInboxRepository
-  implements InboxLifecycleRepository {
+  implements
+    InboxLifecycleRepository,
+    LiveTicketRepository {
   readonly storage:
     DurableObjectStorage
 
@@ -660,6 +683,157 @@ export class SqliteInboxRepository
       deletedAtMs,
       inboxId,
     )
+  }
+
+  async issueLiveTicket({
+    ticketHash,
+    expiresAtMs,
+    nowMs,
+    unexpiredLimit,
+  }: {
+    readonly ticketHash: Uint8Array
+    readonly expiresAtMs: number
+    readonly nowMs: number
+    readonly unexpiredLimit: number
+  }): Promise<LiveTicketIssueResult> {
+    this.ensureSchema()
+
+    if (
+      !isValidTokenDigest(ticketHash) ||
+      !isValidTimestamp(expiresAtMs) ||
+      !isValidTimestamp(nowMs) ||
+      !Number.isSafeInteger(
+        unexpiredLimit,
+      ) ||
+      unexpiredLimit < 1
+    ) {
+      throw new Error(
+        'Live ticket issue input is invalid.',
+      )
+    }
+
+    return this.storage
+      .transactionSync(() => {
+        this.sql.exec(
+          `
+            DELETE FROM live_tickets
+            WHERE expires_at_ms <= ?
+          `,
+          nowMs,
+        )
+
+        const unexpiredCount =
+          this.sql
+            .exec<LiveTicketCountRow>(
+              `
+                SELECT
+                  count(*) AS count
+                FROM live_tickets
+                WHERE expires_at_ms > ?
+              `,
+              nowMs,
+            )
+            .one()
+            .count
+
+        if (
+          unexpiredCount >=
+          unexpiredLimit
+        ) {
+          return {
+            issued: false,
+            reason:
+              'live-ticket-limit-reached',
+          }
+        }
+
+        this.sql.exec(
+          `
+            INSERT INTO live_tickets (
+              ticket_hash,
+              expires_at_ms
+            ) VALUES (
+              ?,
+              ?
+            )
+          `,
+          ticketHash
+            .slice()
+            .buffer,
+          expiresAtMs,
+        )
+
+        return {
+          issued: true,
+        }
+      })
+  }
+
+  async consumeLiveTicket({
+    ticketHash,
+    nowMs,
+  }: {
+    readonly ticketHash: Uint8Array
+    readonly nowMs: number
+  }): Promise<LiveTicketConsumeResult> {
+    this.ensureSchema()
+
+    if (
+      !isValidTokenDigest(ticketHash) ||
+      !isValidTimestamp(nowMs)
+    ) {
+      throw new Error(
+        'Live ticket consume input is invalid.',
+      )
+    }
+
+    return this.storage
+      .transactionSync(() => {
+        const ticketHashBytes =
+          ticketHash
+            .slice()
+            .buffer
+
+        const row =
+          this.sql
+            .exec<LiveTicketExpiryRow>(
+              `
+                SELECT
+                  expires_at_ms
+                FROM live_tickets
+                WHERE ticket_hash = ?
+                LIMIT 1
+              `,
+              ticketHashBytes,
+            )
+            .toArray()[0]
+
+        if (row === undefined) {
+          return {
+            consumed: false,
+            reason: 'not-found',
+          }
+        }
+
+        this.sql.exec(
+          `
+            DELETE FROM live_tickets
+            WHERE ticket_hash = ?
+          `,
+          ticketHashBytes,
+        )
+
+        if (row.expires_at_ms <= nowMs) {
+          return {
+            consumed: false,
+            reason: 'expired',
+          }
+        }
+
+        return {
+          consumed: true,
+        }
+      })
   }
 
   async deleteById(

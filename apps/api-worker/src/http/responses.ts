@@ -9,6 +9,7 @@ import type {
 import type {
   CaptureReadFailureReason,
   CaptureWebhookFailureReason,
+  IssueLiveTicketFailureReason,
   ReadInboxMetadataFailureReason,
 } from '../inbox-object/rpc-types.js'
 
@@ -238,6 +239,29 @@ export function captureReadFailureResponse(
       404,
       'NOT_FOUND',
       'The requested webhook capture was not found.',
+    )
+  }
+
+  return inboxReadFailureResponse(
+    method,
+    reason,
+  )
+}
+
+export function liveTicketIssueFailureResponse(
+  method: string,
+  reason:
+    IssueLiveTicketFailureReason,
+): Response {
+  if (
+    reason ===
+    'live-ticket-limit-reached'
+  ) {
+    return captureError(
+      method,
+      429,
+      'LIVE_TICKET_LIMIT_REACHED',
+      'This webhook inbox has reached its live-ticket limit.',
     )
   }
 

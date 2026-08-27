@@ -6,9 +6,11 @@ import {
   DEFAULT_INBOX_POLICY,
   authorizeInbox,
   clearInboxRequests as clearInboxRequestsUseCase,
+  consumeLiveTicket as consumeLiveTicketUseCase,
   createInbox,
   deleteInbox as deleteInboxUseCase,
   expireInbox,
+  issueLiveTicket as issueLiveTicketUseCase,
   type CreatedInboxCapabilities,
 } from '@reqbug/core'
 
@@ -47,6 +49,8 @@ export type {
   ClearInboxRequestsFailureReason,
   ClearInboxRequestsInput,
   ClearInboxRequestsResult,
+  ConsumeLiveTicketInput,
+  ConsumeLiveTicketResult,
   CaptureReadFailureReason,
   CaptureWebhookFailureReason,
   CaptureWebhookInput,
@@ -54,6 +58,8 @@ export type {
   DeleteInboxFailureReason,
   DeleteInboxInput,
   DeleteInboxResult,
+  IssueLiveTicketInput,
+  IssueLiveTicketResult,
   ListInboxCapturesInput,
   ListInboxCapturesResult,
   ReadCaptureBodyResult,
@@ -67,10 +73,14 @@ export type {
 import type {
   ClearInboxRequestsInput,
   ClearInboxRequestsResult,
+  ConsumeLiveTicketInput,
+  ConsumeLiveTicketResult,
   CaptureWebhookInput,
   CaptureWebhookResult,
   DeleteInboxInput,
   DeleteInboxResult,
+  IssueLiveTicketInput,
+  IssueLiveTicketResult,
   ListInboxCapturesInput,
   ListInboxCapturesResult,
   ReadCaptureBodyResult,
@@ -259,6 +269,43 @@ export class ReqBugInbox
       deletedAtMs:
         result.deletedAtMs,
     }
+  }
+
+  async issueLiveTicket(
+    input: IssueLiveTicketInput,
+  ): Promise<IssueLiveTicketResult> {
+    return issueLiveTicketUseCase(
+      {
+        clock: this.clock,
+        values: this.values,
+        tokenDigests:
+          this.tokenDigests,
+        inboxes:
+          this.repository,
+        liveTickets:
+          this.repository,
+        policy:
+          DEFAULT_INBOX_POLICY,
+      },
+      input,
+    )
+  }
+
+  async consumeLiveTicket(
+    input: ConsumeLiveTicketInput,
+  ): Promise<ConsumeLiveTicketResult> {
+    return consumeLiveTicketUseCase(
+      {
+        clock: this.clock,
+        tokenDigests:
+          this.tokenDigests,
+        inboxes:
+          this.repository,
+        liveTickets:
+          this.repository,
+      },
+      input,
+    )
   }
   
   async listInboxCaptures({

@@ -92,7 +92,11 @@ export function isValidInboxPolicy(
     Number.isSafeInteger(
       policy.liveConnectionLimit,
     ) &&
-    policy.liveConnectionLimit > 0
+    policy.liveConnectionLimit > 0 &&
+    Number.isSafeInteger(
+      policy.liveTicketLifetimeMilliseconds,
+    ) &&
+    policy.liveTicketLifetimeMilliseconds > 0
   )
 }
 

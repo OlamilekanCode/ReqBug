@@ -20,7 +20,28 @@ import type {
   ReqBugInbox,
 } from '../src/inbox-object/reqbug-inbox.js'
 
+import {
+  sha256Bytes,
+} from '../src/platform/crypto.js'
+
 const nowMs = 1_750_000_000_000
+
+interface CountRow
+  extends Record<
+    string,
+    SqlStorageValue
+  > {
+  count: number
+}
+
+interface LiveTicketRow
+  extends Record<
+    string,
+    SqlStorageValue
+  > {
+  ticket_hash: ArrayBuffer
+  expires_at_ms: number
+}
 
 function createInbox(
   inboxId: string,
@@ -57,6 +78,14 @@ function getInboxStub(
 ) {
   return env.INBOXES.getByName(
     name,
+  )
+}
+
+async function liveTicketHash(
+  ticket: string,
+): Promise<Uint8Array> {
+  return sha256Bytes(
+    new TextEncoder().encode(ticket),
   )
 }
 
@@ -275,6 +304,246 @@ describe('SqliteInboxRepository', () => {
               inbox.inboxId,
             ),
         ).toBeNull()
+      },
+    )
+  })
+
+  it('stores only live-ticket digests and cleans expired rows before enforcing the limit', async () => {
+    await runInDurableObject(
+      getInboxStub('live-ticket-issue'),
+      async (
+        instance: ReqBugInbox,
+        state,
+      ) => {
+        const expiredHash =
+          await liveTicketHash(
+            'e'.repeat(43),
+          )
+
+        state.storage.sql.exec(
+          `
+            INSERT INTO live_tickets (
+              ticket_hash,
+              expires_at_ms
+            ) VALUES (
+              ?,
+              ?
+            )
+          `,
+          expiredHash.buffer,
+          nowMs,
+        )
+
+        const rawTicket =
+          't'.repeat(43)
+
+        const ticketHash =
+          await liveTicketHash(
+            rawTicket,
+          )
+
+        await expect(
+          instance.repository
+            .issueLiveTicket({
+              ticketHash,
+              expiresAtMs:
+                nowMs + 30_000,
+              nowMs,
+              unexpiredLimit: 1,
+            }),
+        ).resolves.toEqual({
+          issued: true,
+        })
+
+        await expect(
+          instance.repository
+            .issueLiveTicket({
+              ticketHash:
+                await liveTicketHash(
+                  'u'.repeat(43),
+                ),
+              expiresAtMs:
+                nowMs + 30_000,
+              nowMs,
+              unexpiredLimit: 1,
+            }),
+        ).resolves.toEqual({
+          issued: false,
+          reason:
+            'live-ticket-limit-reached',
+        })
+
+        const rows =
+          state.storage.sql
+            .exec<LiveTicketRow>(
+              `
+                SELECT
+                  ticket_hash,
+                  expires_at_ms
+                FROM live_tickets
+              `,
+            )
+            .toArray()
+
+        expect(rows).toHaveLength(1)
+
+        expect(
+          new Uint8Array(
+            rows[0]!.ticket_hash,
+          ),
+        ).toEqual(ticketHash)
+
+        expect(
+          rows[0]!.expires_at_ms,
+        ).toBe(nowMs + 30_000)
+
+        expect(
+          JSON.stringify(rows),
+        ).not.toContain(rawTicket)
+      },
+    )
+  })
+
+  it('consumes a live ticket exactly once and removes expired tickets', async () => {
+    await runInDurableObject(
+      getInboxStub('live-ticket-consume'),
+      async (
+        instance: ReqBugInbox,
+        state,
+      ) => {
+        const ticketHash =
+          await liveTicketHash(
+            'v'.repeat(43),
+          )
+
+        await instance.repository
+          .issueLiveTicket({
+            ticketHash,
+            expiresAtMs:
+              nowMs + 30_000,
+            nowMs,
+            unexpiredLimit: 3,
+          })
+
+        await expect(
+          instance.repository
+            .consumeLiveTicket({
+              ticketHash,
+              nowMs,
+            }),
+        ).resolves.toEqual({
+          consumed: true,
+        })
+
+        await expect(
+          instance.repository
+            .consumeLiveTicket({
+              ticketHash,
+              nowMs,
+            }),
+        ).resolves.toEqual({
+          consumed: false,
+          reason: 'not-found',
+        })
+
+        const expiredHash =
+          await liveTicketHash(
+            'x'.repeat(43),
+          )
+
+        await instance.repository
+          .issueLiveTicket({
+            ticketHash: expiredHash,
+            expiresAtMs: nowMs,
+            nowMs:
+              nowMs - 1,
+            unexpiredLimit: 3,
+          })
+
+        await expect(
+          instance.repository
+            .consumeLiveTicket({
+              ticketHash:
+                expiredHash,
+              nowMs,
+            }),
+        ).resolves.toEqual({
+          consumed: false,
+          reason: 'expired',
+        })
+
+        const count =
+          state.storage.sql
+            .exec<CountRow>(
+              `
+                SELECT
+                  count(*) AS count
+                FROM live_tickets
+              `,
+            )
+            .one()
+            .count
+
+        expect(count).toBe(0)
+      },
+    )
+  })
+
+  it('does not allow concurrent live-ticket issuance to exceed the unexpired limit', async () => {
+    await runInDurableObject(
+      getInboxStub('live-ticket-concurrent'),
+      async (
+        instance: ReqBugInbox,
+        state,
+      ) => {
+        const results =
+          await Promise.all(
+            Array.from(
+              { length: 10 },
+              async (_, index) =>
+                instance.repository
+                  .issueLiveTicket({
+                    ticketHash:
+                      await liveTicketHash(
+                        `${index}`.repeat(
+                          43,
+                        ),
+                      ),
+                    expiresAtMs:
+                      nowMs + 30_000,
+                    nowMs,
+                    unexpiredLimit: 3,
+                  }),
+            ),
+          )
+
+        expect(
+          results.filter(
+            (result) =>
+              result.issued,
+          ),
+        ).toHaveLength(3)
+
+        expect(
+          results.filter(
+            (result) =>
+              !result.issued,
+          ),
+        ).toHaveLength(7)
+
+        const count =
+          state.storage.sql
+            .exec<CountRow>(
+              `
+                SELECT
+                  count(*) AS count
+                FROM live_tickets
+              `,
+            )
+            .one()
+            .count
+
+        expect(count).toBe(3)
       },
     )
   })

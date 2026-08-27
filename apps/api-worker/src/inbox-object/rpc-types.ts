@@ -4,7 +4,9 @@ import type {
 } from '@reqbug/contracts'
 
 import type {
+  ConsumeLiveTicketFailureReason as CoreConsumeLiveTicketFailureReason,
   InboxAuthorizationFailureReason,
+  IssueLiveTicketFailureReason as CoreIssueLiveTicketFailureReason,
 } from '@reqbug/core'
 
 import type {
@@ -35,6 +37,16 @@ export interface ClearInboxRequestsInput {
 export interface DeleteInboxInput {
   readonly inboxId: string
   readonly readToken: string
+}
+
+export interface IssueLiveTicketInput {
+  readonly inboxId: string
+  readonly readToken: string
+}
+
+export interface ConsumeLiveTicketInput {
+  readonly inboxId: string
+  readonly ticket: string
 }
 
 export interface InboxMetadataSnapshot {
@@ -78,6 +90,12 @@ export type ClearInboxRequestsResult =
 export type DeleteInboxFailureReason =
   InboxAuthorizationFailureReason
 
+export type IssueLiveTicketFailureReason =
+  CoreIssueLiveTicketFailureReason
+
+export type ConsumeLiveTicketFailureReason =
+  CoreConsumeLiveTicketFailureReason
+
 export type DeleteInboxResult =
   | {
       readonly deleted: true
@@ -87,6 +105,28 @@ export type DeleteInboxResult =
       readonly deleted: false
       readonly reason:
         DeleteInboxFailureReason
+    }
+
+export type IssueLiveTicketResult =
+  | {
+      readonly issued: true
+      readonly ticket: string
+      readonly expiresAtMs: number
+    }
+  | {
+      readonly issued: false
+      readonly reason:
+        IssueLiveTicketFailureReason
+    }
+
+export type ConsumeLiveTicketResult =
+  | {
+      readonly consumed: true
+    }
+  | {
+      readonly consumed: false
+      readonly reason:
+        ConsumeLiveTicketFailureReason
     }
 
 export type CaptureReadFailureReason =

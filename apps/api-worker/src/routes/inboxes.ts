@@ -1,6 +1,7 @@
 import {
   CreateInboxResponseSchema,
   InboxMetadataResponseSchema,
+  LiveTicketResponseSchema,
   MAX_CAPTURE_BODY_BYTES,
   MAX_INBOX_CAPTURE_COUNT,
 } from '@reqbug/contracts'
@@ -21,6 +22,7 @@ import {
   captureError,
   inboxReadFailureResponse,
   jsonResponse,
+  liveTicketIssueFailureResponse,
   noContentResponse,
 } from '../http/responses.js'
 
@@ -200,6 +202,78 @@ export function registerInboxRoutes(
           request.method,
           response,
           200,
+        )
+      } catch {
+        return captureError(
+          request.method,
+          503,
+          'INBOX_UNAVAILABLE',
+          'The webhook inbox is temporarily unavailable.',
+        )
+      }
+    },
+  )
+
+  app.post(
+    '/api/v1/inboxes/:inboxId/live-tickets',
+    async (context) => {
+      const request =
+        context.req.raw
+
+      const inboxId =
+        context.req.param('inboxId')
+
+      const readToken =
+        getBearerCapability(request)
+
+      if (
+        inboxId === undefined ||
+        readToken === null
+      ) {
+        return captureError(
+          request.method,
+          404,
+          'NOT_FOUND',
+          'The requested webhook inbox was not found.',
+        )
+      }
+
+      const inbox =
+        context.env.INBOXES.getByName(
+          inboxId,
+        )
+
+      try {
+        const result =
+          await inbox.issueLiveTicket({
+            inboxId,
+            readToken,
+          })
+
+        if (!result.issued) {
+          return liveTicketIssueFailureResponse(
+            request.method,
+            result.reason,
+          )
+        }
+
+        const response =
+          LiveTicketResponseSchema.parse({
+            data: {
+              ticket:
+                result.ticket,
+
+              expiresAt:
+                new Date(
+                  result.expiresAtMs,
+                ).toISOString(),
+            },
+          })
+
+        return jsonResponse(
+          request.method,
+          response,
+          201,
         )
       } catch {
         return captureError(

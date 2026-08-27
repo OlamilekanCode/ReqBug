@@ -3,6 +3,7 @@ export interface InboxPolicy {
   readonly lifetimeRequestLimit: number
   readonly requestBodyByteLimit: number
   readonly liveConnectionLimit: number
+  readonly liveTicketLifetimeMilliseconds: number
 }
 
 export const DEFAULT_INBOX_POLICY = {
@@ -10,4 +11,5 @@ export const DEFAULT_INBOX_POLICY = {
   lifetimeRequestLimit: 50,
   requestBodyByteLimit: 256 * 1024,
   liveConnectionLimit: 3,
+  liveTicketLifetimeMilliseconds: 30 * 1000,
 } as const satisfies InboxPolicy
